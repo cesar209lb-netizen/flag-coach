@@ -39,8 +39,8 @@ export function simBounds(sim) {
 }
 
 export class PlayStage {
-  constructor(group, { showNames = true, loop = false, rings = true, r = 1.15, onUpdate = null } = {}) {
-    Object.assign(this, { group, showNames, loop, rings, r, onUpdate });
+  constructor(group, { showNames = true, loop = false, rings = true, r = 1.15, onUpdate = null, focus = null } = {}) {
+    Object.assign(this, { group, showNames, loop, rings, r, onUpdate, focus });
     this.speed = 1;
     this.playing = false;
     this.t = 0;
@@ -56,11 +56,12 @@ export class PlayStage {
     this.playData = play;
     this.ctx = ctx;
     this.sim = sim || simulate(play, ctx);
-    this.gRoutes.innerHTML = routesMarkup(play, { faint: true, target: this.sim.target });
+    this.gRoutes.innerHTML = routesMarkup(play, { faint: !this.focus, focus: this.focus, target: this.sim.target });
     this.gOff.innerHTML = play.players.map((p) =>
       `<g><circle class="ring" r="${this.r + 0.75}" fill="none" stroke-width=".3" opacity="0"/>${tokenMarkup(p, ctx.tokenInfo(p.assigned), { r: this.r, showName: this.showNames })}</g>`).join('');
     this.offEls = [...this.gOff.children];
     this.ringEls = this.offEls.map((e) => e.querySelector('.ring'));
+    this.applyFocus();
     this.gDef.innerHTML = this.sim.defs.map((d) => `<g>${defenderMarkup(d)}</g>`).join('');
     this.defEls = [...this.gDef.children];
     this.gBall.innerHTML = ballMarkup();
@@ -161,6 +162,24 @@ export class PlayStage {
       this.gGain.innerHTML = '';
     }
     this.emit();
+  }
+
+  // Fade the players who are not the one being studied. The QB stays bright
+  // because the ball comes from him.
+  applyFocus() {
+    if (!this.offEls) return;
+    this.offEls.forEach((el, i) => {
+      const slot = this.sim?.actors[i];
+      const on = !this.focus || slot === this.focus || slot === 'QB';
+      el.setAttribute('opacity', on ? '1' : '0.25');
+    });
+  }
+
+  setFocus(slot) {
+    this.focus = slot || null;
+    if (!this.playData) return;
+    this.gRoutes.innerHTML = routesMarkup(this.playData, { faint: !this.focus, focus: this.focus, target: this.sim.target });
+    this.applyFocus();
   }
 
   emit() { if (this.sim) this.onUpdate?.(this); }

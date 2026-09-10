@@ -598,6 +598,12 @@ textarea.input { resize: vertical; line-height: 1.45; }
 }
 .p-help.bad { color: #fca5a5; }
 .steps a { color: var(--accent); }
+.set-title.pad { margin-top: 14px; }
+.btn-row.pad { margin: 8px 0 4px; }
+
+/* "Watch" picker in huddle mode — which player you are studying. */
+.hd-focus { display: flex; align-items: center; gap: 8px; }
+.hd-focus-label { color: #cfe3d4; font-size: 13px; font-weight: 700; text-shadow: 0 1px 6px rgba(0, 0, 0, .6); }
 
 /* ---------- Responsive ---------- */
 @media (orientation: portrait), (max-width: 900px) {

@@ -76,12 +76,15 @@ function routeEnd(pts) {
   return { x: end.x + ((end.x - prev.x) / L) * 1.6, y: end.y + ((end.y - prev.y) / L) * 1.6 };
 }
 
-export function routesMarkup(play, { selected = null, faint = false, badges = true, target = undefined, scale = 1 } = {}) {
+// `focus` spotlights one player: their route stays bright and everyone else's
+// drops right back, which is how a player studies their own assignment.
+export function routesMarkup(play, { selected = null, faint = false, badges = true, target = undefined, scale = 1, focus = null } = {}) {
   const tgt = target === undefined ? passTarget(play) : target;
   let under = '', over = '', marks = '';
   for (const p of play.players) {
     const col = ROUTE_COLORS[p.slot];
-    const dim = faint ? 0.4 : selected && selected !== p.slot ? 0.5 : 1;
+    const dim = focus ? (p.slot === focus || p.slot === 'QB' ? 1 : 0.12)
+      : faint ? 0.4 : selected && selected !== p.slot ? 0.5 : 1;
     if (p.motion.length) {
       const d = pathD(absMotion(p));
       under += `<path d="${d}" fill="none" stroke="#06140a" stroke-opacity=".35" stroke-width="${0.46 * scale}" stroke-linecap="round" stroke-linejoin="round"/>`;

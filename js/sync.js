@@ -6,7 +6,7 @@
 // travel as tombstones so they are not undone by the other device's copy.
 
 import * as db from './db.js';
-import { state, applyRemote, pendingRecords, clearPending, queueAll, loadState, onSyncQueue, refreshUI } from './store.js';
+import { state, applyRemote, pendingRecords, clearPending, queueAll, loadState, onSyncQueue, refreshUI, setReadOnly } from './store.js';
 
 const TABLE = 'records';
 const PAGE = 200;
@@ -35,6 +35,7 @@ function emit(patch = {}) {
 
 export async function loadConfig() {
   cfg = (await db.get('sync', 'config')) || null;
+  setReadOnly(isViewer());
   emit({
     state: cfg?.enabled ? 'idle' : 'off',
     lastSyncAt: cfg?.lastSyncAt || null,
@@ -46,9 +47,21 @@ export async function loadConfig() {
 
 export const config = () => cfg;
 export const isOn = () => !!cfg?.enabled;
+// A player device follows the team read-only: it never pushes, and the store
+// only ever hands it plays and the league rules — never the roster.
+export const isViewer = () => cfg?.role === 'viewer';
+export const VIEWER_KINDS = ['play', 'settings'];
+
+// The player code is a one-way hash of the coach's team code, so holding it
+// cannot get you edit access.
+export async function playerCodeFor(team) {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(team)));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 async function saveConfig(patch) {
   cfg = { id: 'config', ...(cfg || {}), ...patch };
+  setReadOnly(isViewer());
   await db.put('sync', cfg);
   emit({ lastSyncAt: cfg.lastSyncAt || null, team: cfg.team || '' });
   return cfg;
@@ -57,6 +70,7 @@ async function saveConfig(patch) {
 export async function unpair() {
   await db.del('sync', 'config');
   cfg = null;
+  setReadOnly(false);
   clearTimeout(timer);
   clearInterval(auto);
   auto = 0;
@@ -78,8 +92,14 @@ export const makeTeamCode = () => {
   return [...bytes].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 20);
 };
 
-export function encodePairing({ url, key, team }) {
-  return `flagcoach1.${b64u.enc(JSON.stringify({ u: url, k: key, t: team }))}`;
+export function encodePairing({ url, key, team, role = 'coach' }) {
+  return `flagcoach1.${b64u.enc(JSON.stringify({ u: url, k: key, t: team, r: role === 'viewer' ? 'v' : 'c' }))}`;
+}
+
+// The code a coach hands a player: same store, hashed code, read-only role.
+export async function playerPairing() {
+  if (!cfg) return '';
+  return encodePairing({ url: cfg.url, key: cfg.key, team: await playerCodeFor(cfg.team), role: 'viewer' });
 }
 
 export function decodePairing(text) {
@@ -93,7 +113,10 @@ export function decodePairing(text) {
     throw new Error('That team code looks incomplete — copy the whole thing.');
   }
   if (!o.u || !o.k || !o.t) throw new Error('That team code is missing part of its setup.');
-  return { url: String(o.u).replace(/\/+$/, ''), key: String(o.k), team: String(o.t) };
+  return {
+    url: String(o.u).replace(/\/+$/, ''), key: String(o.k), team: String(o.t),
+    role: o.r === 'v' ? 'viewer' : 'coach',
+  };
 }
 
 // ---------- Transport ----------
@@ -133,6 +156,7 @@ const toRow = (r) => ({
 // ---------- Push / pull ----------
 
 async function push() {
+  if (isViewer()) return 0;
   const rows = await pendingRecords();
   if (!rows.length) return 0;
   let sent = 0;
@@ -172,11 +196,12 @@ async function pull() {
   for (let page = 0; page < 200; page++) {
     const qs = new URLSearchParams({
       select: 'kind,id,updated_at,deleted,data,synced_at',
-      team: `eq.${cfg.team}`,
       synced_at: `gt.${from}`,
       order: 'synced_at.asc',
       limit: String(PAGE),
     });
+    if (isViewer()) qs.set('kind', `in.(${VIEWER_KINDS.join(',')})`);
+    else qs.set('team', `eq.${cfg.team}`);
     const res = await request(`${TABLE}?${qs}`, { headers: headers() });
     const rows = await res.json();
     for (const row of rows) {
@@ -241,7 +266,7 @@ export function sync({ quiet = false } = {}) {
 
 // Pair this device as the team's first device: push everything it already has.
 export async function createTeam({ url, key, team }) {
-  await saveConfig({ url: url.replace(/\/+$/, ''), key, team, enabled: true, cursor: null });
+  await saveConfig({ url: url.replace(/\/+$/, ''), key, team, role: 'coach', enabled: true, cursor: null });
   await queueAll();
   await refreshPendingCount();
   start();
@@ -250,8 +275,8 @@ export async function createTeam({ url, key, team }) {
 
 // Pair this device onto an existing team, taking the team's copy. The local
 // playbook is replaced so both devices start from one shared state.
-export async function joinTeam({ url, key, team }) {
-  await saveConfig({ url: url.replace(/\/+$/, ''), key, team, enabled: true, cursor: null });
+export async function joinTeam({ url, key, team, role = 'coach' }) {
+  await saveConfig({ url: url.replace(/\/+$/, ''), key, team, role, enabled: true, cursor: null });
   await clearStore('pending');
   await clearStore('tombstones');
   await db.replaceAll({ meta: [{ ...state.settings, updatedAt: 0, seeded: true }] });
@@ -291,6 +316,15 @@ export function start() {
 }
 
 // The SQL a new team store needs, shown in Settings so it can be copied once.
+// Run once on an existing team store to switch on player view. Included in
+// SETUP_SQL too, so a new team gets it from the start.
+export const PLAYER_SQL = `drop policy if exists records_viewer on records;
+create policy records_viewer on records for select
+  using (
+    kind in ('play', 'settings')
+    and encode(sha256(team::bytea), 'hex') = nullif(current_setting('request.headers', true), '')::json->>'x-team-code'
+  );`;
+
 export const SETUP_SQL = `create table if not exists records (
   team text not null,
   kind text not null,
@@ -319,4 +353,11 @@ grant select, insert, update on table records to anon;
 drop policy if exists records_team on records;
 create policy records_team on records for all
   using (team = nullif(current_setting('request.headers', true), '')::json->>'x-team-code')
-  with check (team = nullif(current_setting('request.headers', true), '')::json->>'x-team-code');`;
+  with check (team = nullif(current_setting('request.headers', true), '')::json->>'x-team-code');
+
+drop policy if exists records_viewer on records;
+create policy records_viewer on records for select
+  using (
+    kind in ('play', 'settings')
+    and encode(sha256(team::bytea), 'hex') = nullif(current_setting('request.headers', true), '')::json->>'x-team-code'
+  );`;

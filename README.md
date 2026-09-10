@@ -43,6 +43,31 @@ Settings → Team sync → **Join a team** → paste the code. That iPad takes t
 team's copy (its own plays are replaced — save a backup first if it has any),
 and from then on both stay in step.
 
+**Giving players a read-only copy**
+
+Players (or parents) can study the playbook on their own phone without being
+able to change anything, and without seeing the roster.
+
+1. Coach: Settings → Team sync → **Invite a player**. The sheet shows a short
+   SQL block — run it once in the store's SQL Editor to switch player view on.
+   Teams set up after this feature shipped already have it; running it twice is
+   harmless.
+2. Send the **player code** from that same sheet. It is safe to give the whole
+   team.
+3. The player installs the app and pastes it into Settings → Team sync →
+   **Join a team**, same as a coach.
+
+A player device gets the playbook and full-screen animated Huddle mode, with no
+Roster tab, no editing and no New Play. In Huddle mode the **Watch** picker
+spotlights one player's route and fades the rest, so a kid can follow their own
+assignment. Local edits on a player device are refused outright rather than
+queued, so it stays an exact mirror of the coaches' playbook.
+
+The player code is the SHA-256 of the coach's team code, and the store's row
+policy only lets it read rows of kind `play` and `settings`. So a leaked player
+code exposes the plays and the league rules — never the roster, and it cannot be
+turned back into a coach code or used to write anything.
+
 **How it behaves**
 
 - Edits go up a few seconds after you make them, and each iPad pulls every 30
@@ -51,8 +76,9 @@ and from then on both stay in step.
   internet.
 - If two people change the same play, the most recent edit wins. Deletes travel
   too, so removing a play on one iPad removes it on the other.
-- The team code is the key to the team: anyone holding it can read and change
-  the plays and roster, which include player names and photos. Send it directly
+- The **coach** code is the key to the team: anyone holding it can read and
+  change the plays and roster, which include player names and photos. (The
+  player code is read-only and roster-free — see above.) Send it directly
   to the person, don't post it anywhere public, and note that the URL and key
   live only on the paired iPads — they are never part of the app's public files.
 - **Stop syncing** unpairs one iPad and leaves everything it has in place.

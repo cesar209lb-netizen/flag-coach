@@ -1,7 +1,8 @@
 // App shell: boot, hash router, tab bar, offline service worker.
 
-import { loadState } from './store.js';
+import { loadState, playById } from './store.js';
 import * as sync from './sync.js';
+import { openHuddle } from './views/huddle.js';
 import { h, icon, toast } from './ui.js';
 import * as Home from './views/home.js';
 import * as Playbook from './views/playbook.js';
@@ -12,7 +13,7 @@ import * as Settings from './views/settings.js';
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'playbook', label: 'Playbook', icon: 'playbook' },
-  { id: 'roster', label: 'Roster', icon: 'users' },
+  { id: 'roster', label: 'Roster', icon: 'users', coachOnly: true },
   { id: 'settings', label: 'Settings', icon: 'sliders' },
 ];
 const VIEWS = { home: Home, playbook: Playbook, roster: Roster, settings: Settings };
@@ -22,12 +23,20 @@ const tabbar = document.getElementById('tabbar');
 let current = null;
 
 function renderTabs(active) {
-  tabbar.replaceChildren(...TABS.map((t) =>
+  tabbar.replaceChildren(...TABS.filter((t) => !(t.coachOnly && sync.isViewer())).map((t) =>
     h('a', { class: `tab ${active === t.id ? 'on' : ''}`, href: `#/${t.id}` }, icon(t.icon), h('span', null, t.label))));
 }
 
 function route() {
-  const [name = 'home', arg] = location.hash.replace(/^#\/?/, '').split('/');
+  let [name = 'home', arg] = location.hash.replace(/^#\/?/, '').split('/');
+  // Player view has no editor and no roster; send those back to the playbook.
+  if (sync.isViewer() && (name === 'roster' || name === 'play')) {
+    const playId = name === 'play' ? arg : null;
+    history.replaceState(null, '', '#/playbook');
+    name = 'playbook';
+    arg = undefined;
+    if (playId && playById(playId)) setTimeout(() => openHuddle([playId], 0), 0);
+  }
   try { current?.destroy?.(); } catch (e) { console.error(e); }
   current = null;
   viewEl.replaceChildren();

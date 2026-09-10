@@ -23,6 +23,13 @@ export function onSyncQueue(fn) { syncSubs.add(fn); return () => syncSubs.delete
 // queued straight back to it.
 let applying = false;
 
+// A player device mirrors the team read-only. Local writes are refused rather
+// than left to pile up as records that could never reach anyone.
+let readOnly = false;
+export const setReadOnly = (v) => { readOnly = !!v; };
+export const isReadOnly = () => readOnly;
+const blocked = () => readOnly && !applying;
+
 function queue(kind, id) {
   if (applying) return;
   db.put('pending', { id: `${kind}:${id}`, kind, ref: id, at: Date.now() }).catch(() => {});
@@ -157,6 +164,8 @@ function touched() {
 // ---------- Settings ----------
 export async function saveSettings(patch, { silent = false } = {}) {
   const shared = SYNCED_SETTINGS.some((k) => k in patch);
+  // Team rules belong to the coaches; a player device only stores its own.
+  if (blocked() && shared) return;
   Object.assign(state.settings, patch);
   if (shared && !('updatedAt' in patch)) state.settings.updatedAt = Date.now();
   await db.put('meta', state.settings);
@@ -168,6 +177,7 @@ export async function saveSettings(patch, { silent = false } = {}) {
 export const playById = (id) => state.plays.find((p) => p.id === id);
 
 export async function savePlay(play, { silent = false } = {}) {
+  if (blocked()) return;
   if (!applying) play.updatedAt = Date.now();
   const copy = structuredClone(play);
   upsert(state.plays, copy);
@@ -178,6 +188,7 @@ export async function savePlay(play, { silent = false } = {}) {
 }
 
 export async function deletePlay(id) {
+  if (blocked()) return;
   state.plays = state.plays.filter((p) => p.id !== id);
   await db.del('plays', id);
   await tombstone('play', id);
@@ -211,6 +222,7 @@ export function tokenInfo(playerId) {
 }
 
 export async function savePlayer(player, { silent = false } = {}) {
+  if (blocked()) return;
   if (!applying) player.updatedAt = Date.now();
   upsert(state.players, player);
   await db.put('players', player);
@@ -220,6 +232,7 @@ export async function savePlayer(player, { silent = false } = {}) {
 }
 
 export async function deletePlayer(id) {
+  if (blocked()) return;
   state.players = state.players.filter((p) => p.id !== id);
   await db.del('players', id);
   await tombstone('player', id);
@@ -236,6 +249,7 @@ export async function deletePlayer(id) {
 }
 
 export async function saveSeason(season, { silent = false } = {}) {
+  if (blocked()) return;
   if (!applying) season.updatedAt = Date.now();
   upsert(state.seasons, season);
   await db.put('seasons', season);
@@ -245,6 +259,7 @@ export async function saveSeason(season, { silent = false } = {}) {
 }
 
 export async function deleteSeason(id) {
+  if (blocked()) return;
   state.seasons = state.seasons.filter((s) => s.id !== id);
   await db.del('seasons', id);
   await tombstone('season', id);

@@ -4,7 +4,7 @@ import { h, icon, iconBtn, btn, openSheet, confirmDialog, promptDialog, toast, s
 import { state, subscribe, activeSeason, saveSettings, saveSeason, deleteSeason, eraseEverything } from '../store.js';
 import { newSeason, seasonNameFor } from '../model.js';
 import { saveBackup, restoreBackup } from '../backup.js';
-import { onStatus, unpair, isOn } from '../sync.js';
+import { onStatus, unpair, isOn, isViewer } from '../sync.js';
 import { teamSyncSection } from './teamsync.js';
 
 export const APP_VERSION = '1.0';
@@ -23,6 +23,9 @@ const row = (label, sub, control) => h('div', { class: 'set-row' },
 function build(rerender = () => {}) {
   const s = state.settings;
   const active = activeSeason();
+  // Player view follows the coach's plays and rules, so there is nothing here
+  // to change — only the team it follows and whether it works offline.
+  const viewer = isViewer();
 
   const team = h('input', { class: 'input', value: s.teamName, maxLength: 40, style: { maxWidth: '280px' } });
   team.addEventListener('change', () => saveSettings({ teamName: team.value.trim() || 'My Team' }, { silent: true }));
@@ -39,11 +42,11 @@ function build(rerender = () => {}) {
   return h('div', { class: 'page settings' },
     h('header', { class: 'page-head' }, h('h1', null, 'Settings')),
 
-    h('section', { class: 'set-section' },
+    viewer ? null : h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'Team'),
       row('Team name', 'Shown on the home screen and player cards', team)),
 
-    h('section', { class: 'set-section' },
+    viewer ? null : h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'Seasons'),
       ...state.seasons.slice().reverse().map((season) => row(
         season.name, `${season.roster.length} player${season.roster.length === 1 ? '' : 's'}`,
@@ -60,7 +63,7 @@ function build(rerender = () => {}) {
           }, { title: 'Delete season', cls: 'small' }) : null))),
       h('div', { class: 'set-row' }, btn('Start a new season', openNewSeason, { iconName: 'plus', kind: 'ghost' }))),
 
-    h('section', { class: 'set-section' },
+    viewer ? null : h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'League rules'),
       row('Pass clock', 'How long the QB has to throw', stepper(s.passClock, { min: 3, max: 15, suffix: 's', onChange: (v) => saveSettings({ passClock: v }, { silent: true }) })),
       row('Rusher distance', 'How far off the line the rusher starts', stepper(s.rushDistance, { min: 3, max: 15, suffix: ' yds', onChange: (v) => saveSettings({ rushDistance: v }, { silent: true }) })),
@@ -68,7 +71,7 @@ function build(rerender = () => {}) {
 
     teamSyncSection(row, rerender),
 
-    h('section', { class: 'set-section' },
+    viewer ? null : h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'Backup & restore'),
       row('Last backup', s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString() : 'Your plays and roster only live on this iPad',
         h('span', { class: `status ${backupAge < 7 * 864e5 ? 'ok' : 'no'}` }, timeAgo(s.lastBackupAt))),

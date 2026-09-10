@@ -5,6 +5,7 @@ import { state, subscribe, savePlay, deletePlay } from '../store.js';
 import { FORMATIONS, newPlay, copyPlay, flipPlay } from '../model.js';
 import { playThumb } from '../field.js';
 import { openHuddle } from './huddle.js';
+import { isViewer } from '../sync.js';
 
 let query = '';
 let tagFilter = 'All';
@@ -22,8 +23,9 @@ export function mount(root) {
     h('header', { class: 'page-head' },
       h('div', null, h('h1', null, 'Playbook'), countEl),
       h('div', { class: 'head-actions' },
-        btn('Huddle', () => { const l = filtered(); if (l.length) openHuddle(l.map((p) => p.id), 0); }, { iconName: 'expand', kind: 'ghost' }),
-        btn('New Play', openNewPlaySheet, { iconName: 'plus', kind: 'primary' }))),
+        btn(isViewer() ? 'Watch all' : 'Huddle', () => { const l = filtered(); if (l.length) openHuddle(l.map((p) => p.id), 0); },
+          { iconName: 'expand', kind: isViewer() ? 'primary' : 'ghost' }),
+        isViewer() ? null : btn('New Play', openNewPlaySheet, { iconName: 'plus', kind: 'primary' }))),
     h('div', { class: 'toolbar' }, h('div', { class: 'search-wrap' }, icon('search'), search), sortWrap),
     chipsEl, gridEl));
 
@@ -61,24 +63,33 @@ export function mount(root) {
     if (!list.length) {
       gridEl.replaceChildren(h('div', { class: 'empty-state' },
         h('div', { class: 'empty-icon' }, icon('playbook')),
-        h('h3', null, state.plays.length ? 'No plays match' : 'Your playbook is empty'),
-        state.plays.length ? h('p', null, 'Try a different search or tag.') : btn('Create your first play', openNewPlaySheet, { kind: 'primary', iconName: 'plus' })));
+        h('h3', null, state.plays.length ? 'No plays match' : isViewer() ? 'No plays yet' : 'Your playbook is empty'),
+        state.plays.length ? h('p', null, 'Try a different search or tag.')
+          : isViewer() ? h('p', null, 'Your coach has not added any plays yet. They will show up here on their own.')
+            : btn('Create your first play', openNewPlaySheet, { kind: 'primary', iconName: 'plus' })));
       return;
     }
     const ids = list.map((p) => p.id);
-    gridEl.replaceChildren(...list.map((p, i) =>
-      h('article', { class: 'play-card' },
-        h('a', { class: 'play-card-main', href: `#/play/${p.id}` },
-          h('div', { class: 'thumb-wrap', html: playThumb(p, W) }),
-          h('div', { class: 'play-card-info' },
-            h('div', { class: 'play-name' }, p.name),
-            h('div', { class: 'play-meta' }, p.formation || ''),
-            h('div', { class: 'play-card-row' },
-              stars(p.rating || 0, { size: 'sm' }),
-              p.tags.length ? h('div', { class: 'tag-list' }, p.tags.slice(0, 2).map((t) => h('span', { class: 'tag' }, t))) : null))),
+    const viewer = isViewer();
+    gridEl.replaceChildren(...list.map((p, i) => {
+      const info = [
+        h('div', { class: 'thumb-wrap', html: playThumb(p, W) }),
+        h('div', { class: 'play-card-info' },
+          h('div', { class: 'play-name' }, p.name),
+          h('div', { class: 'play-meta' }, p.formation || ''),
+          h('div', { class: 'play-card-row' },
+            stars(p.rating || 0, { size: 'sm' }),
+            p.tags.length ? h('div', { class: 'tag-list' }, p.tags.slice(0, 2).map((t) => h('span', { class: 'tag' }, t))) : null)),
+      ];
+      // A player taps a card to watch it; a coach taps it to edit it.
+      const main = viewer
+        ? h('button', { class: 'play-card-main', onclick: () => openHuddle(ids, i), title: `Watch ${p.name}` }, ...info)
+        : h('a', { class: 'play-card-main', href: `#/play/${p.id}` }, ...info);
+      return h('article', { class: 'play-card' }, main,
         h('div', { class: 'play-card-actions' },
-          iconBtn('expand', () => openHuddle(ids, i), { title: 'Huddle mode', cls: 'small' }),
-          iconBtn('more', () => cardMenu(p), { title: 'More', cls: 'small' })))));
+          iconBtn('expand', () => openHuddle(ids, i), { title: viewer ? 'Watch' : 'Huddle mode', cls: 'small' }),
+          viewer ? null : iconBtn('more', () => cardMenu(p), { title: 'More', cls: 'small' })));
+    }));
   }
 
   function render() { renderSort(); renderChips(); renderGrid(); }

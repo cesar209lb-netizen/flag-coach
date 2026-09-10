@@ -81,7 +81,7 @@ function joinSheet(onDone) {
     title: 'Join a team',
     size: 'md',
     body: h('div', null,
-      h('p', { class: 'p-help' }, 'Paste the team code from the iPad that already has the playbook (Settings → Team sync → Invite a device).'),
+      h('p', { class: 'p-help' }, 'Paste the code you were given. A coach code lets you edit the playbook; a player code is read-only for studying plays.'),
       code,
       h('p', { class: 'p-help' }, 'Joining replaces this iPad’s plays, roster and seasons with the team’s copy, then keeps both in step from here on.'),
       err),
@@ -99,10 +99,13 @@ function joinSheet(onDone) {
             err.textContent = String(e.message || e);
             return false;
           }
+          const player = pairing.role === 'viewer';
           const ok = await confirmDialog({
-            title: 'Replace this iPad’s playbook?',
-            message: 'The team’s plays, roster and seasons take over on this iPad. Anything only on this iPad is lost — save a backup first if you need it.',
-            confirmText: 'Replace & join',
+            title: player ? 'Join as a player?' : 'Replace this iPad’s playbook?',
+            message: player
+              ? 'This device will show the team’s plays, read-only — no editing, and no roster. Anything already on this device is replaced.'
+              : 'The team’s plays, roster and seasons take over on this iPad. Anything only on this iPad is lost — save a backup first if you need it.',
+            confirmText: player ? 'Join as player' : 'Replace & join',
             danger: true,
           });
           if (!ok) return false;
@@ -113,7 +116,7 @@ function joinSheet(onDone) {
             await sync.unpair();
             return false;
           }
-          toast('Joined the team');
+          toast(pairing.role === 'viewer' ? 'Following the team' : 'Joined the team');
           onDone?.();
           return true;
         },
@@ -128,10 +131,10 @@ function inviteSheet() {
   const pairing = sync.encodePairing(cfg);
   const box = h('textarea', { class: 'input code', rows: 4, readonly: true, spellcheck: 'false' }, pairing);
   openSheet({
-    title: 'Invite a device',
+    title: 'Invite a coach',
     size: 'md',
     body: h('div', null,
-      h('p', { class: 'p-help' }, 'On the other iPad, open Flag Coach → Settings → Team sync → Join a team, and paste this code.'),
+      h('p', { class: 'p-help' }, 'For another coach who needs to build plays. On their iPad: Flag Coach → Settings → Team sync → Join a team, and paste this code. For a player who only needs to study, use “Invite a player” instead.'),
       box,
       h('div', { class: 'btn-row tight pad' },
         btn('Copy code', async () => {
@@ -143,16 +146,67 @@ function inviteSheet() {
   });
 }
 
+function playerSheet() {
+  const cfg = sync.config();
+  if (!cfg) return;
+  const sql = h('textarea', { class: 'input code', rows: 6, readonly: true, spellcheck: 'false' }, sync.PLAYER_SQL);
+  const box = h('textarea', { class: 'input code', rows: 4, readonly: true, spellcheck: 'false' }, 'building the code…');
+  sync.playerPairing().then((code) => { box.value = code; });
+
+  openSheet({
+    title: 'Invite a player',
+    size: 'lg',
+    body: h('div', null,
+      h('p', { class: 'p-help' }, 'A player code is read-only. It shows the playbook and the animation — no editing, and the roster stays on the coaches’ iPads only.'),
+      h('div', { class: 'set-title pad' }, 'One-time: switch player view on'),
+      h('p', { class: 'p-help' }, 'Run this once in your store’s SQL Editor. Skip it if you set the team up after player view existed — it is already in place, and running it twice is harmless.'),
+      h('div', { class: 'btn-row tight pad' },
+        btn('Copy the SQL', async () => {
+          try { await navigator.clipboard.writeText(sync.PLAYER_SQL); toast('SQL copied'); } catch { sql.select(); }
+        }, { iconName: 'copy', kind: 'small ghost' })),
+      sql,
+      h('div', { class: 'set-title pad' }, 'The player code'),
+      box,
+      h('div', { class: 'btn-row tight pad' },
+        btn('Copy player code', async () => {
+          try { await navigator.clipboard.writeText(box.value); toast('Player code copied'); } catch { box.select(); }
+        }, { iconName: 'copy', kind: 'primary' }),
+        btn('Share', () => navigator.share?.({ title: 'Flag Coach player code', text: box.value }).catch(() => {}), { iconName: 'share', kind: 'ghost' })),
+      h('p', { class: 'p-help' }, 'The player pastes it into Settings → Team sync → Join a team, same as a coach. Safe to give the whole team: it cannot change anything, and it cannot be turned back into your coach code.')),
+    actions: [{ label: 'Done', kind: 'primary' }],
+  });
+}
+
 // ---------- Section ----------
 
 export function teamSyncSection(row, rerender) {
   const s = sync.status;
   const statusEl = h('span', { class: `status ${toneOf(s)}` }, stateText(s));
 
+  // A player device follows the team; there is nothing for it to send or share.
+  if (sync.isViewer()) {
+    return h('section', { class: 'set-section' },
+      h('div', { class: 'set-title' }, 'Team sync'),
+      row('Following the team', 'Plays arrive on their own. This device cannot change them.', statusEl),
+      h('p', { class: 'p-help pad' }, 'New plays show up within a few seconds of your coach saving them, and whenever you reopen the app. It all works with no internet — you just see the plays as of the last time you had a signal.'),
+      h('div', { class: 'set-row' },
+        btn('Check for new plays', async () => { await sync.sync(); }, { iconName: 'restart', kind: 'small primary' })),
+      h('div', { class: 'set-row' },
+        btn('Stop following this team', async () => {
+          if (await confirmDialog({
+            title: 'Stop following?',
+            message: 'The plays already on this device stay, but you stop getting new ones. You can join again with the player code.',
+            confirmText: 'Stop following',
+            danger: true,
+          })) { await sync.unpair(); rerender(); }
+        }, { kind: 'ghost danger-text', iconName: 'wifiOff' })));
+  }
+
   const controls = sync.isOn()
     ? h('div', { class: 'btn-row tight' },
       btn('Sync now', async () => { await sync.sync(); }, { iconName: 'restart', kind: 'small primary' }),
-      btn('Invite a device', inviteSheet, { iconName: 'share', kind: 'small ghost' }))
+      btn('Invite a coach', inviteSheet, { iconName: 'share', kind: 'small ghost' }),
+      btn('Invite a player', playerSheet, { iconName: 'users', kind: 'small ghost' }))
     : h('div', { class: 'btn-row tight' },
       btn('Set up team sync', () => setupSheet(rerender), { iconName: 'share', kind: 'primary' }),
       btn('Join a team', () => joinSheet(rerender), { iconName: 'upload', kind: 'ghost' }));
@@ -160,8 +214,8 @@ export function teamSyncSection(row, rerender) {
   return h('section', { class: 'set-section' },
     h('div', { class: 'set-title' }, 'Team sync'),
     row('Status', sync.isOn() ? 'Plays, roster and rules stay in step across paired iPads' : 'Off — plays live only on this iPad', statusEl),
-    sync.isOn() ? h('p', { class: 'p-help pad' }, 'Edits sync a few seconds after you make them, and whenever the app comes back online. If two people change the same play, the most recent edit wins.')
-      : h('p', { class: 'p-help pad' }, 'Pair another iPad so plays made at home show up at practice. Needs a free store you set up once — backups keep working either way.'),
+    sync.isOn() ? h('p', { class: 'p-help pad' }, 'Edits sync a few seconds after you make them, and whenever the app comes back online. If two people change the same play, the most recent edit wins. A player code is read-only and never includes the roster.')
+      : h('p', { class: 'p-help pad' }, 'Pair another iPad so plays made at home show up at practice, and hand players a read-only code to study from. Needs a free store you set up once — backups keep working either way.'),
     h('div', { class: 'set-row' }, controls),
     sync.isOn() ? h('div', { class: 'set-row' },
       btn('Stop syncing on this iPad', async () => {

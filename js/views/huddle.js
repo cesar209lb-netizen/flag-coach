@@ -21,6 +21,12 @@ const CHROME_RESERVE = 0.7;
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 let showDefense = true;
 let huddleSpeed = 1;
+// Which player the viewer is studying. Remembered, since a kid is always the
+// same position.
+const prefFocus = {
+  get() { try { return localStorage.getItem('fc-focus') || ''; } catch { return ''; } },
+  set(v) { try { v ? localStorage.setItem('fc-focus', v) : localStorage.removeItem('fc-focus'); } catch { /* private mode */ } },
+};
 
 export function openHuddle(playIds, startIndex = 0) {
   const ids = playIds.filter((id) => playById(id));
@@ -32,7 +38,8 @@ export function openHuddle(playIds, startIndex = 0) {
   svg.setAttribute('class', 'field-svg huddle-field');
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.innerHTML = `<g>${fieldMarkup(W, { view: HUDDLE_VIEW, rushDistance: state.settings.rushDistance, pad: PAD_X })}</g><g></g>`;
-  const stage = new PlayStage(svg.children[1], { loop: true, r: 1.3, onUpdate: onStage });
+  let focus = prefFocus.get();
+  const stage = new PlayStage(svg.children[1], { loop: true, r: 1.3, onUpdate: onStage, focus: focus || null });
   stage.speed = huddleSpeed;
 
   const title = h('div', { class: 'hd-title' });
@@ -45,6 +52,7 @@ export function openHuddle(playIds, startIndex = 0) {
   const nextBtn = iconBtn('next', () => go(1), { title: 'Next play', cls: 'big' });
   const speedWrap = h('div');
   const defWrap = h('div');
+  const focusWrap = h('div', { class: 'hd-focus' });
 
   const fieldBox = h('div', { class: 'hd-field' }, svg, result);
   const topBar = h('header', { class: 'hd-top' },
@@ -57,7 +65,7 @@ export function openHuddle(playIds, startIndex = 0) {
     h('div', { class: 'spacer' }),
     notes,
     h('div', { class: 'spacer' }),
-    defWrap, speedWrap);
+    focusWrap, defWrap, speedWrap);
 
   const overlay = h('div', { class: 'huddle' }, topBar, fieldBox, bottomBar);
 
@@ -66,6 +74,19 @@ export function openHuddle(playIds, startIndex = 0) {
       (v) => { stage.speed = huddleSpeed = v; renderControls(); }, { cls: 'small' }));
     defWrap.replaceChildren(segmented([{ value: true, label: 'Defense' }, { value: false, label: 'Routes only' }], showDefense,
       (v) => { showDefense = v; renderControls(); load(); }, { cls: 'small' }));
+    // "Who am I" — spotlights one player's route through the whole playbook.
+    const play = playById(ids[index]);
+    const opts = [{ value: '', label: 'All' }, ...(play?.players || [])
+      .filter((p) => p.slot !== 'QB' && p.slot !== 'C')
+      .map((p) => ({ value: p.slot, label: p.label || p.slot }))];
+    focusWrap.replaceChildren(
+      h('span', { class: 'hd-focus-label' }, 'Watch'),
+      segmented(opts, focus, (v) => {
+        focus = v;
+        prefFocus.set(v);
+        stage.setFocus(v || null);
+        renderControls();
+      }, { cls: 'small' }));
   }
 
   // Zoom the view to the play so it fills the screen: the field always spans the
@@ -132,6 +153,7 @@ export function openHuddle(playIds, startIndex = 0) {
     stage.load(shown, simContext(play));
     bounds = simBounds(stage.sim);
     fitView();
+    renderControls();
     stage.play();
   }
 
