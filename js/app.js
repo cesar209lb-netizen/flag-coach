@@ -90,7 +90,13 @@ function registerServiceWorker() {
 }
 
 async function boot() {
-  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  // Pinch is the only way back out of an accidental double-tap zoom on iOS, so
+  // it is blocked on the drawing surfaces only — a stray pinch mid-route would
+  // fight the route being drawn — and left alone everywhere else. Blocking it
+  // for the whole document trapped anyone who zoomed in, with no way back.
+  document.addEventListener('gesturestart', (e) => {
+    if (e.target?.closest?.('.field-svg, .lab-field svg')) e.preventDefault();
+  });
   try {
     await loadState();
   } catch (e) {
