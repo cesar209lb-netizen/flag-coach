@@ -117,9 +117,10 @@ export const FORMATIONS = [
   { id: 'trips', name: 'Trips Right', desc: '3 receivers right', pos: { X: [4.5, -1], Y: [8, -1.5], Z: [12, -1] } },
   { id: 'twins', name: 'Twins Right', desc: '1 left · 2 right', pos: { X: [-12, -1], Y: [7, -1], Z: [12, -1] } },
   { id: 'bunch', name: 'Bunch Right', desc: 'Tight triangle', pos: { X: [7, -1], Y: [8.8, -2.6], Z: [5.2, -2.6] } },
-  // Everybody tight over the center: X and Z flank the snapper on the line,
-  // Y sits behind them in the gap between the snapper and the QB.
-  { id: 'bunchMid', name: 'Bunch Middle', desc: 'All tight over center', pos: { X: [-2.2, -1], Y: [0, -2.8], Z: [2.2, -1] } },
+  // All four line players shoulder to shoulder in the middle, 2.2 yards apart,
+  // with the QB directly behind the snapper. Overrides the BASE QB and C spots.
+  { id: 'bunchMid', name: 'Bunch Middle', desc: '4 across, QB behind center',
+    pos: { QB: [-1.1, -5], C: [-1.1, -1], X: [-3.3, -1], Y: [1.1, -1], Z: [3.3, -1] } },
   { id: 'stack', name: 'Stack Left', desc: 'Stacked receivers', pos: { X: [-10, -1], Y: [-10, -3.5], Z: [12, -1] } },
   { id: 'pistol', name: 'Pistol', desc: 'RB behind QB', pos: { X: [-12, -1], Y: [0, -8, 'RB'], Z: [12, -1] } },
   { id: 'split', name: 'Split Back', desc: 'RB beside QB', pos: { X: [-12, -1], Y: [-3, -5, 'RB'], Z: [12, -1] } },
