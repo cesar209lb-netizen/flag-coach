@@ -107,8 +107,6 @@ export function routesMarkup(play, { selected = null, faint = false, badges = tr
   return under + over + marks;
 }
 
-let clipSeq = 0;
-
 export function tokenMarkup(p, info = {}, { r = 1.15, showName = false, selected = false } = {}) {
   const col = SLOT_COLORS[p.slot];
   const txt = SLOT_TEXT[p.slot];
@@ -116,18 +114,9 @@ export function tokenMarkup(p, info = {}, { r = 1.15, showName = false, selected
   let s = `<circle class="hit" r="${r + 0.9}" fill="transparent"/>`;
   s += `<circle class="sel-ring" r="${r + 0.5}" fill="none" stroke="#fff" stroke-width=".2" stroke-dasharray=".7 .4" opacity="${selected ? 1 : 0}"/>`;
   s += `<circle r="${r + 0.1}" cy=".18" fill="#000" opacity=".35"/>`;
-  if (info.photo) {
-    const id = `clip${++clipSeq}`;
-    s += `<clipPath id="${id}"><circle r="${r}"/></clipPath><circle r="${r}" fill="${col}"/>`;
-    s += `<image href="${info.photo}" x="${-r}" y="${-r}" width="${2 * r}" height="${2 * r}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>`;
-    s += `<circle r="${r - 0.12}" fill="none" stroke="${col}" stroke-width=".26"/>`;
-    const br = r * 0.46;
-    s += `<g transform="translate(${f2(r * 0.78)} ${f2(-r * 0.78)})"><circle r="${br}" fill="${col}" stroke="#0b1016" stroke-width=".08"/><text y="${f2(br * 0.36)}" font-size="${f2(br * (label.length > 1 ? 0.95 : 1.2))}" fill="${txt}" class="tok-t" text-anchor="middle">${label}</text></g>`;
-  } else {
-    s += `<circle r="${r}" fill="${col}" stroke="#0b1016" stroke-width=".12"/>`;
-    const fs = r * (label.length > 1 ? 0.82 : 1.05);
-    s += `<text y="${f2(fs * 0.36)}" font-size="${f2(fs)}" fill="${txt}" class="tok-t" text-anchor="middle">${label}</text>`;
-  }
+  s += `<circle r="${r}" fill="${col}" stroke="#0b1016" stroke-width=".12"/>`;
+  const fs = r * (label.length > 1 ? 0.82 : 1.05);
+  s += `<text y="${f2(fs * 0.36)}" font-size="${f2(fs)}" fill="${txt}" class="tok-t" text-anchor="middle">${label}</text>`;
   if (showName && info.first) {
     s += `<text y="${f2(r + 1.15)}" font-size=".8" class="tok-name" text-anchor="middle">${esc(info.first)}${info.number ? ` #${esc(info.number)}` : ''}</text>`;
   }

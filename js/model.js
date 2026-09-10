@@ -78,9 +78,11 @@ export function seasonNameFor(date = new Date()) {
 
 export const newSeason = (name) => ({ id: uid(), name, createdAt: Date.now(), roster: [] });
 
+// Deliberately minimal: a first name and, on the roster entry, a jersey number.
+// No surname, photo, contact or medical field — this syncs to a store on the
+// internet, and none of that belongs there for a child.
 export const newPlayer = () => ({
-  id: uid(), first: '', last: '', nickname: '', photo: null,
-  parentName: '', parentPhone: '', medical: '', notes: '',
+  id: uid(), first: '',
   createdAt: Date.now(), updatedAt: Date.now(),
 });
 

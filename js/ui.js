@@ -207,7 +207,7 @@ export function timeAgo(ts) {
 }
 
 export function initials(p) {
-  return ((p.first?.[0] || '') + (p.last?.[0] || '')).toUpperCase() || '?';
+  return (p.first?.[0] || '').toUpperCase() || '?';
 }
 
 export function stars(value, { size = '', onChange = null } = {}) {

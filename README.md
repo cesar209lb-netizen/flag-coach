@@ -2,7 +2,7 @@
 
 A 5v5 flag football coaching app, built for a coach's iPad but usable from any
 phone, tablet or computer: playbook with a route designer and play animation,
-roster with photos, huddle mode, and backups. Plain HTML/CSS/JavaScript — no
+roster, huddle mode, and backups. Plain HTML/CSS/JavaScript — no
 build step, no accounts. Data lives on the device (IndexedDB), and the app keeps
 working with no signal once installed — which matters on a field on game day.
 Optional team sync shares one playbook across every paired device, and hands
@@ -49,7 +49,7 @@ device until you turn it on.
    (Settings → Team sync → Set up team sync → *Copy the SQL*) → **Run**.
 3. In the project: **Settings → API** → copy the **Project URL** and the
    **publishable** key into the app, then tap **Start syncing**. This device's
-   plays, roster, photos and rules go up.
+   plays, roster and rules go up.
 4. Tap **Invite a device** and AirDrop or text the team code to the other coach.
 
 **On the other device**
@@ -94,7 +94,8 @@ turned back into a coach code or used to write anything.
 - If two people change the same play, the most recent edit wins. Deletes travel
   too, so removing a play on one device removes it on the others.
 - The **coach** code is the key to the team: anyone holding it can read and
-  change the plays and roster, which include player names and photos. (The
+  change the plays and roster. The roster holds first names and jersey
+  numbers only — no surnames, photos, contacts or medical notes. (The
   player code is read-only and roster-free — see above.) Send it directly
   to the person, don't post it anywhere public, and note that the URL and key
   live only on the paired devices — they are never part of the app's public files.
@@ -103,7 +104,7 @@ turned back into a coach code or used to write anything.
 
 ## Updating the app
 
-Whenever files change, bump `CACHE` in `sw.js` (e.g. `flagcoach-v2`) before uploading. Next time the device opens the app online, it shows **"A new version is ready → Update"**. Plays, roster and photos are not affected by updates.
+Whenever files change, bump `CACHE` in `sw.js` (e.g. `flagcoach-v2`) before uploading. Next time the device opens the app online, it shows **"A new version is ready → Update"**. Plays, roster and seasons are not affected by updates.
 
 ## Designing against a defense
 
@@ -122,7 +123,7 @@ once, which is the fastest way to find the one that breaks it.
 
 ## Backups
 
-Settings → **Save backup** creates one `.json` file (plays, roster, photos, seasons). Save it to iCloud Drive. **Restore from backup** replaces everything on the device with the file's contents.
+Settings → **Save backup** creates one `.json` file (plays, roster, seasons). Save it to iCloud Drive. **Restore from backup** replaces everything on the device with the file's contents.
 
 ## Code map
 

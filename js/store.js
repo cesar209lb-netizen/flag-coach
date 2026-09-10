@@ -130,11 +130,30 @@ const upsert = (arr, obj) => {
   if (i >= 0) arr[i] = obj; else arr.push(obj);
 };
 
+// The roster once held surnames, photos, parent contacts and medical notes. All
+// of it synced to the team store, and none of it belongs on the internet for a
+// child, so any record still carrying those fields is rewritten on load. The
+// rewrite is queued like any other edit, which clears the old copy from the
+// store as well as this device.
+const RETIRED_FIELDS = ['last', 'nickname', 'photo', 'parentName', 'parentPhone', 'medical', 'notes'];
+
+async function stripPersonalFields(players) {
+  return Promise.all(players.map(async (p) => {
+    if (!RETIRED_FIELDS.some((f) => p[f] != null && p[f] !== '')) return p;
+    const clean = { ...p };
+    for (const f of RETIRED_FIELDS) delete clean[f];
+    clean.updatedAt = Date.now();
+    await db.put('players', clean);
+    if (!readOnly) queue('player', clean.id);
+    return clean;
+  }));
+}
+
 export async function loadState() {
   await db.open();
   const [meta, players, seasons, plays] = await Promise.all(['meta', 'players', 'seasons', 'plays'].map(db.getAll));
   state.settings = { ...defaultSettings(), ...(meta.find((m) => m.id === 'settings') || {}) };
-  state.players = players;
+  state.players = await stripPersonalFields(players);
   state.seasons = seasons.sort((a, b) => a.createdAt - b.createdAt);
   state.plays = plays;
 
@@ -212,13 +231,13 @@ export function rosterFor(season = activeSeason()) {
 
 export const entryFor = (playerId, season = activeSeason()) => season?.roster.find((r) => r.playerId === playerId) || null;
 
-// Info used to draw a player on the field (photo, number, first name, ratings).
+// Info used to draw a player on the field (number, first name, ratings).
 export function tokenInfo(playerId) {
   if (!playerId) return {};
   const p = playerById(playerId);
   if (!p) return {};
   const e = entryFor(playerId);
-  return { photo: p.photo, number: e?.number || '', first: p.nickname || p.first, ratings: e?.ratings };
+  return { number: e?.number || '', first: p.first, ratings: e?.ratings };
 }
 
 export async function savePlayer(player, { silent = false } = {}) {

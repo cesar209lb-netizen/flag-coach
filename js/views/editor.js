@@ -573,11 +573,11 @@ export function mount(root, playId) {
               P(sel).assigned = on ? null : player.id;
             }),
           },
-          player.photo ? h('img', { src: player.photo, alt: '' }) : h('span', { class: 'av-initials' }, (player.first[0] || '?').toUpperCase()),
-          h('span', { class: 'av-name' }, player.nickname || player.first),
+          h('span', { class: 'av-initials' }, (player.first[0] || '?').toUpperCase()),
+          h('span', { class: 'av-name' }, player.first),
           entry.number ? h('span', { class: 'av-num' }, `#${entry.number}`) : null);
         }))
-        : h('p', { class: 'p-help' }, 'Add players on the Roster tab to put their photos on the field.'));
+        : h('p', { class: 'p-help' }, 'Add players on the Roster tab to put their names on the field.'));
 
     let routeSection;
     if (drawTarget === 'motion') {
