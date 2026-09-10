@@ -14,7 +14,11 @@ const RUSH_SPEED = 5.4;
 const TAG_R = 0.8;       // defender this close pulls the flag
 const INT_R = 0.4;       // defender this close to the catch point picks it off
 const PBU_R = 0.9;       // …or knocks it down
-const MAN_LAG = 24;      // frames (0.4s) a man defender reacts behind the receiver
+const MAN_LAG = 20;      // frames a man defender trails a receiver running straight
+const MAN_LAG_PRESS = 14; // pressed up he starts closer, so he gives up less
+const ZONE_REACH = 7.5;  // how far a zone defender will come off his area
+const BALL_REACT = 0.45; // how long before a defender reads a throw
+const CONTEST_R = 1.5;   // arriving this close still counts as contesting
 const BREAKAWAY_Y = 22;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -292,8 +296,59 @@ export function simulate(play, ctx) {
     give(ball.target, 'catch');
   }
 
+  // Zone defenders divide the receivers between them instead of each drifting at
+  // whoever happens to be nearest — which used to put two defenders on one man
+  // and leave another standing alone. Nearest pair first, one claim per receiver;
+  // a defender left without one holds his area, which is the job.
+  function assignZones() {
+    const zones = defs.filter((d) => d.kind === 'zone');
+    const recs = [];
+    for (let i = 0; i < actors.length; i++) {
+      if (actors[i].slot !== 'QB' && off[i].y >= -1) recs.push(i);
+    }
+    const claim = new Map(), taken = new Set();
+
+    const pairs = [];
+    for (const d of zones) {
+      for (const i of recs) {
+        const s = off[i];
+        const gap = Math.hypot(s.x - d.ax, s.y - d.ay);
+        if (gap > ZONE_REACH) continue;
+        // A deep defender answers for the deepest threat; a short one takes what
+        // is in front of him rather than chasing something over the top.
+        const bias = d.deep ? Math.max(0, 12 - s.y) * 0.35 : Math.max(0, s.y - 8) * 0.35;
+        pairs.push({ d, i, cost: gap + bias });
+      }
+    }
+    pairs.sort((a, b) => a.cost - b.cost);
+    for (const pr of pairs) {
+      if (claim.has(pr.d) || taken.has(pr.i)) continue;
+      claim.set(pr.d, { i: pr.i, commit: false });
+      taken.add(pr.i);
+    }
+
+    // Anyone still running free gets picked up by the nearest spare defender,
+    // even from outside his area. A stretched zone beats a receiver nobody has —
+    // holding an empty patch of grass while a man runs open is the one thing a
+    // zone is not allowed to do.
+    for (const i of recs) {
+      if (taken.has(i)) continue;
+      let pick = null, bd = Infinity;
+      for (const d of zones) {
+        if (claim.has(d)) continue;
+        const dd = dist(off[i], d);
+        if (dd < bd) { bd = dd; pick = d; }
+      }
+      if (!pick) continue;
+      claim.set(pick, { i, commit: true });
+      taken.add(i);
+    }
+    return claim;
+  }
+
   function stepDefense(step) {
     const t = now;
+    const zoneClaim = assignZones();
     const carrierS = ball.mode === 'held' ? off[idx[ball.carrier]] : null;
     const pursuit = carrierS && !result && ((possessionKind !== 'qb' && t - possessionT > 0.35) || (possessionKind === 'qb' && carrierS.y > 0.5));
     const qbS = off[idx.QB];
@@ -315,25 +370,29 @@ export function simulate(play, ctx) {
         // Aim further ahead of the runner the farther away the defender is (take an angle).
         goal = lead(carrierS, clamp(dist(d, carrierS) / (d.speed + 1), 0.2, 1));
         maxS = d.speed + 0.2;
-      } else if (ball.mode === 'air' && ball.kind === 'pass' && t - ball.t0 > 0.45 && dist(d, ball.to) < (d.kind === 'zone' ? 8 : 3)) {
+      } else if (ball.mode === 'air' && ball.kind === 'pass' && t - ball.t0 > BALL_REACT
+        // Break on the throw only if he can actually get there: distance against
+        // what is left of the flight. A fixed radius sent defenders chasing balls
+        // they could never reach and left them standing by ones they could.
+        && dist(d, ball.to) <= (d.speed + 0.2) * Math.max(0, ball.t1 - t) + CONTEST_R) {
         goal = ball.to;
         maxS = d.speed + 0.2;
       } else if (d.kind === 'man') {
-        const lag = frames[Math.max(0, step - MAN_LAG)]?.off;
         const ti = idx[d.target];
+        // Pressed up he starts closer and gives up less ground than off coverage.
+        const lagFrames = d.cushion <= 2 ? MAN_LAG_PRESS : MAN_LAG;
+        const lag = frames[Math.max(0, step - lagFrames)]?.off;
         const rp = lag ? { x: lag[ti * 2], y: lag[ti * 2 + 1] } : off[ti];
         // Press starts tight and stays tight; off coverage closes from its cushion.
         goal = { x: rp.x + d.shade * 0.5, y: rp.y + Math.max(1.2, Math.min(3, d.cushion) - 1.3 * t) };
         acc = 11;
       } else {
         const anchor = { x: d.ax, y: d.ay };
-        let best = null, bd = 7.5;
-        for (let i = 0; i < actors.length; i++) {
-          if (actors[i].slot === 'QB') continue;
-          const s = off[i], dd = dist(s, anchor);
-          if (dd < bd && s.y > -1) { bd = dd; best = s; }
-        }
+        const claimed = zoneClaim.get(d);
+        const best = claimed ? off[claimed.i] : null;
         if (!best) goal = anchor;
+        // Sole responsibility: go and get him rather than drifting from the anchor.
+        else if (claimed.commit) goal = { x: best.x, y: best.y + (d.deep ? 1.6 : 0.5) };
         else if (d.deep) goal = { x: anchor.x + (best.x - anchor.x) * 0.55, y: Math.max(anchor.y - 2, best.y + 2.2) };
         else goal = { x: anchor.x + clamp((best.x - anchor.x) * 0.75, -5, 5), y: anchor.y + clamp((best.y - anchor.y) * 0.75, -3, 4) };
       }
