@@ -313,7 +313,10 @@ create trigger records_touch before insert or update on records
 
 alter table records enable row level security;
 
+grant usage on schema public to anon;
+grant select, insert, update on table records to anon;
+
 drop policy if exists records_team on records;
 create policy records_team on records for all
-  using (team = current_setting('request.headers', true)::json->>'x-team-code')
-  with check (team = current_setting('request.headers', true)::json->>'x-team-code');`;
+  using (team = nullif(current_setting('request.headers', true), '')::json->>'x-team-code')
+  with check (team = nullif(current_setting('request.headers', true), '')::json->>'x-team-code');`;
