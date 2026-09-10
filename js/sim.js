@@ -506,21 +506,31 @@ function describe(r, sim, play, ctx) {
   }
 }
 
-// Try every release time for a pass and keep the one that works best.
-export function bestThrowTime(play, ctx, evId) {
+// How good an outcome is, for ranking one throw against another: a catch with
+// separation and yards beats a catch in traffic, and a turnover is worst.
+function scoreOutcome(sim, releaseT) {
+  const r = sim.result;
+  return r.caught
+    ? 20 + Math.min(sim.sep ?? 0, 6) * 3 + clamp(r.yards, -3, 25) * 0.5 - releaseT * 0.6
+    : r.kind === 'int' ? -20 : r.kind === 'sack' ? -15 : -8;
+}
+
+// Try every release time for a pass and keep the one that works best. `to`
+// overrides the play's own target, which is how receivers get compared.
+export function bestThrowTime(play, ctx, evId, { to = undefined, step = 0.1 } = {}) {
   const i = play.ball.findIndex((b) => b.id === evId);
   if (i < 0) return null;
   const minT = i > 0 ? (play.ball[i - 1].time || 0.5) + 0.3 : 0.5;
+  const base = structuredClone(play);
+  if (to !== undefined) base.ball[i].to = to;
   let best = null;
-  for (let rt = minT; rt <= ctx.passClock - 0.2 + 1e-6; rt += 0.1) {
-    const p2 = structuredClone(play);
+  for (let rt = minT; rt <= ctx.passClock - 0.2 + 1e-6; rt += step) {
+    const p2 = structuredClone(base);
     p2.ball[i].time = Math.round(rt * 10) / 10;
     const s = simulate(p2, ctx);
-    const r = s.result;
-    const score = r.caught
-      ? 20 + Math.min(s.sep ?? 0, 6) * 3 + clamp(r.yards, -3, 25) * 0.5 - rt * 0.6
-      : r.kind === 'int' ? -20 : r.kind === 'sack' ? -15 : -8;
-    if (!best || score > best.score) best = { time: p2.ball[i].time, score, result: r };
+    const score = scoreOutcome(s, p2.ball[i].time);
+    if (!best || score > best.score) best = { time: p2.ball[i].time, score, result: s.result, sep: s.sep ?? null };
   }
   return best;
 }
+

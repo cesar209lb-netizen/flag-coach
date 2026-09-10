@@ -4,6 +4,7 @@ import { h, icon, iconBtn, segmented } from '../ui.js';
 import { state, playById } from '../store.js';
 import { HUDDLE_VIEW, fieldMarkup } from '../field.js';
 import { PlayStage, simContext, simBounds } from '../stage.js';
+import { bestThrowTime } from '../sim.js';
 import { defenseOf, defenseLabel } from '../model.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -77,16 +78,38 @@ export function openHuddle(playIds, startIndex = 0) {
     // "Who am I" — spotlights one player's route through the whole playbook.
     const play = playById(ids[index]);
     const opts = [{ value: '', label: 'All' }, ...(play?.players || [])
-      .filter((p) => p.slot !== 'QB' && p.slot !== 'C')
+      .filter((p) => p.slot !== 'QB')
       .map((p) => ({ value: p.slot, label: p.label || p.slot }))];
     focusWrap.replaceChildren(
       h('span', { class: 'hd-focus-label' }, 'Watch'),
       segmented(opts, focus, (v) => {
         focus = v;
         prefFocus.set(v);
-        stage.setFocus(v || null);
-        renderControls();
+        stage.focus = v || null;
+        load();
       }, { cls: 'small' }));
+  }
+
+  // Picking a spot throws that player the ball, with the release timed for
+  // their route — so a player sees what the play looks like coming to them.
+  // Display only: the coach's saved play is never touched.
+  const timedCache = new Map();
+  function throwTo(base, slot, ctx) {
+    const pass = base.ball.find((b) => b.type === 'pass');
+    if (!slot || !pass || pass.to === slot) return base;
+    const key = `${base.id}:${slot}:${showDefense}`;
+    let time = timedCache.get(key);
+    if (time == null) {
+      const aimed = structuredClone(base);
+      aimed.ball.find((b) => b.id === pass.id).to = slot;
+      time = bestThrowTime(aimed, ctx, pass.id, { step: 0.3 })?.time ?? pass.time;
+      timedCache.set(key, time);
+    }
+    const out = structuredClone(base);
+    const ev = out.ball.find((b) => b.id === pass.id);
+    ev.to = slot;
+    ev.time = time;
+    return out;
   }
 
   // Zoom the view to the play so it fills the screen: the field always spans the
@@ -140,17 +163,26 @@ export function openHuddle(playIds, startIndex = 0) {
 
   function load() {
     const play = playById(ids[index]);
-    const shown = showDefense ? play : { ...play, defense: { coverage: 'none', rush: false } };
+    const base = showDefense ? play : { ...play, defense: { coverage: 'none', rush: false } };
+    const ctx = simContext(play);
+    const shown = throwTo(base, focus, ctx);
+    const aimed = !!focus && shown.players.some((p) => p.slot === focus)
+      && !!shown.ball.find((b) => b.type === 'pass');
     title.textContent = play.name;
     const def = defenseOf(play);
-    sub.textContent = [play.formation, showDefense && def.coverage !== 'none' ? `vs ${defenseLabel(def)}` : null].filter(Boolean).join(' · ');
+    const focusLabel = play.players.find((p) => p.slot === focus)?.label || focus;
+    sub.textContent = [
+      play.formation,
+      showDefense && def.coverage !== 'none' ? `vs ${defenseLabel(def)}` : null,
+      aimed ? `ball to ${focusLabel}` : null,
+    ].filter(Boolean).join(' · ');
     counter.textContent = ids.length > 1 ? `${index + 1} / ${ids.length}` : '';
     notes.textContent = play.notes || '';
     prevBtn.disabled = index === 0;
     nextBtn.disabled = index === ids.length - 1;
     resultKey = '';
     result.hidden = true;
-    stage.load(shown, simContext(play));
+    stage.load(shown, ctx);
     bounds = simBounds(stage.sim);
     fitView();
     renderControls();
