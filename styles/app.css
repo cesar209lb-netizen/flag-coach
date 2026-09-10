@@ -545,6 +545,7 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .qr-box { display: flex; justify-content: center; margin: 6px 0 10px; }
 .qr-box .qr { width: min(280px, 68vw); height: auto; border-radius: 10px; }
 .share-slot { min-height: 72px; }
+.delay-row { display: flex; align-items: center; gap: 12px; }
 .steps { margin: 4px 0 14px; padding-left: 22px; color: var(--muted); font-size: 14px; }
 .steps li { margin: 4px 0; }
 .steps b { color: var(--text); }

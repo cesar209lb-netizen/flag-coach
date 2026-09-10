@@ -139,7 +139,7 @@ export function newPlay({ name = 'New Play', formationId = 'spread', W = 30 } = 
     id: uid(), name, formation: f.name, tags: [], rating: 0, notes: '',
     players: SLOTS.map((slot) => {
       const { x, y, label } = formationPos(f, slot, W);
-      return { slot, label, x, y, route: [], routeId: null, motion: [], read: null, assigned: null };
+      return { slot, label, x, y, route: [], routeId: null, motion: [], read: null, assigned: null, delay: 0 };
     }),
     ball: [{ id: uid(), type: 'pass', to: null, time: 2.0, auto: false }],
     defense: { look: 'base', coverage: 'man', rush: true },

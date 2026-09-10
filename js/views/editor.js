@@ -1,6 +1,6 @@
 // Play designer: drag players, tap/draw routes, motion, ball events, defense, animation.
 
-import { h, icon, iconBtn, btn, segmented, stars, toast, confirmDialog, actionSheet, promptDialog } from '../ui.js';
+import { h, icon, iconBtn, btn, segmented, stepper, stars, toast, confirmDialog, actionSheet, promptDialog } from '../ui.js';
 import { state, playById, savePlay, deletePlay, rosterFor, tokenInfo, saveSettings } from '../store.js';
 import {
   SLOT_COLORS, SLOT_TEXT, ROUTES, QB_ROUTES, FORMATIONS, COVERAGES, LOOKS, applyRoute, applyFormation, flipPlay,
@@ -541,7 +541,7 @@ export function mount(root, playId) {
           return h('button', { class: 'player-row', onclick: () => selectSlot(p.slot) },
             slotDot(p.slot, p.label),
             h('div', { class: 'pr-main' }, h('div', { class: 'pr-name' }, info.first ? `${info.first}${info.number ? ` #${info.number}` : ''}` : 'Unassigned'),
-              h('div', { class: 'pr-sub' }, routeLabel(p) + (p.motion.length ? ' · motion' : ''))),
+              h('div', { class: 'pr-sub' }, routeLabel(p) + (p.motion.length ? ' · motion' : '') + (p.delay ? ` · waits ${p.delay}s` : ''))),
             p.read ? h('span', { class: 'read-chip' }, `Read ${p.read}`) : null,
             icon('next', 'chev'));
         }))),
@@ -604,6 +604,20 @@ export function mount(root, playId) {
           btn('Clear', () => commit(() => { P(sel).route = []; P(sel).routeId = null; }, { tokens: false }), { kind: 'small ghost danger-text', disabled: !p.route.length })));
     }
 
+    // A delayed release: hold the spot at the snap, then run the route as drawn.
+    // The defender covering them waits too, which is the point of the thing.
+    const delaySection = !isQB && p.slot !== 'C' && drawTarget !== 'motion' ? section('Delayed release',
+      h('p', { class: 'p-help' }, `How long ${p.label} stands still after the snap before running. Everyone else goes on the snap.`),
+      h('div', { class: 'delay-row' },
+        stepper(p.delay || 0, {
+          min: 0,
+          max: 3,
+          step: 0.5,
+          suffix: 's',
+          onChange: (v) => commit(() => { P(sel).delay = v; }, { key: `delay:${sel}`, tokens: false }),
+        }),
+        h('span', { class: 'muted small' }, p.delay ? 'Counts, then runs' : 'Goes on the snap'))) : null;
+
     const target = passTarget(play);
     const readSection = !isQB ? section('QB read order',
       segmented([{ value: null, label: 'None' }, { value: 1, label: '1st' }, { value: 2, label: '2nd' }, { value: 3, label: '3rd' }, { value: 4, label: '4th' }],
@@ -629,7 +643,7 @@ export function mount(root, playId) {
       canMotion ? h('div', { class: 'p-section tight' }, segmented(
         [{ value: 'route', label: 'Route' }, { value: 'motion', label: 'Pre-snap motion' }], drawTarget,
         (v) => { drawTarget = v; drawDesign(); renderPanel(); })) : null,
-      routeSection, readSection, assign);
+      routeSection, delaySection, readSection, assign);
   }
 
   function ballPanel() {

@@ -74,7 +74,7 @@ function buildActors(play, ctx) {
     return {
       slot: p.slot, p, speed, start,
       motion: keyframes(mPts, speed * 0.6, false, 0),
-      route: keyframes(rPts, speed, true, p.slot === 'QB' ? 0.25 : 0.1),
+      route: keyframes(rPts, speed, true, (p.slot === 'QB' ? 0.25 : 0.1) + Math.max(0, p.delay || 0)),
     };
   });
 }
