@@ -22,6 +22,22 @@ export function simContext(play) {
   };
 }
 
+// Vertical extent of everything that moves during a play, in field yards.
+// Huddle mode zooms the view to this so the play fills the screen.
+export function simBounds(sim) {
+  let yMin = Infinity, yMax = -Infinity;
+  const add = (y) => { if (y < yMin) yMin = y; if (y > yMax) yMax = y; };
+  for (const f of sim.frames) {
+    for (let i = 1; i < f.off.length; i += 2) add(f.off[i]);
+    for (let j = 1; j < f.def.length; j += 2) add(f.def[j]);
+    add(f.by + f.bh * 0.55);
+  }
+  const res = sim.result;
+  if (res && res.kind !== 'none') add(res.y);
+  if (!Number.isFinite(yMin)) return { yMin: -8, yMax: 15 };
+  return { yMin, yMax };
+}
+
 export class PlayStage {
   constructor(group, { showNames = true, loop = false, rings = true, r = 1.15, onUpdate = null } = {}) {
     Object.assign(this, { group, showNames, loop, rings, r, onUpdate });

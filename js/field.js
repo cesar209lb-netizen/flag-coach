@@ -6,6 +6,9 @@ import { esc } from './ui.js';
 
 export const EDIT_VIEW = { yMin: -10, yMax: 23 };
 export const THUMB_VIEW = { yMin: -9, yMax: 17 };
+// Huddle mode crops into this generously tall field so the view can zoom to the
+// play and still fill any screen shape without running out of painted grass.
+export const HUDDLE_VIEW = { yMin: -24, yMax: 46 };
 
 const f2 = (n) => Math.round(n * 100) / 100;
 

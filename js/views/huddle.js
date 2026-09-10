@@ -2,11 +2,23 @@
 
 import { h, icon, iconBtn, segmented } from '../ui.js';
 import { state, playById } from '../store.js';
-import { EDIT_VIEW, viewBox, fieldMarkup } from '../field.js';
-import { PlayStage, simContext } from '../stage.js';
+import { HUDDLE_VIEW, fieldMarkup } from '../field.js';
+import { PlayStage, simContext, simBounds } from '../stage.js';
 import { defenseOf, defenseLabel } from '../model.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
+// Sideline padding, breathing room above/below the action, and the tightest
+// zoom we allow — all in field yards.
+const PAD_X = 0.8;
+const PAD_Y = 1.2;
+const MIN_SPAN = 19;
+// On very tall screens filling the frame outright would zoom the play out, so
+// only grow the view this far before letting the grass letterbox instead.
+const MAX_SPAN = 34;
+// The floating title and controls sit on translucent scrims, so the play only
+// has to stay clear of most of them — reserving every pixel would cost zoom.
+const CHROME_RESERVE = 0.7;
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 let showDefense = true;
 let huddleSpeed = 1;
 
@@ -18,9 +30,8 @@ export function openHuddle(playIds, startIndex = 0) {
 
   const svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('class', 'field-svg huddle-field');
-  svg.setAttribute('viewBox', viewBox(W, EDIT_VIEW));
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  svg.innerHTML = `<g>${fieldMarkup(W, { rushDistance: state.settings.rushDistance })}</g><g></g>`;
+  svg.innerHTML = `<g>${fieldMarkup(W, { view: HUDDLE_VIEW, rushDistance: state.settings.rushDistance, pad: PAD_X })}</g><g></g>`;
   const stage = new PlayStage(svg.children[1], { loop: true, r: 1.3, onUpdate: onStage });
   stage.speed = huddleSpeed;
 
@@ -35,19 +46,20 @@ export function openHuddle(playIds, startIndex = 0) {
   const speedWrap = h('div');
   const defWrap = h('div');
 
-  const overlay = h('div', { class: 'huddle' },
-    h('header', { class: 'hd-top' },
-      h('div', { class: 'hd-heading' }, title, sub),
-      h('div', { class: 'spacer' }),
-      counter,
-      iconBtn('x', close, { title: 'Close huddle mode', cls: 'big' })),
-    h('div', { class: 'hd-field' }, svg, result),
-    h('footer', { class: 'hd-bottom' },
-      prevBtn, playBtn, nextBtn,
-      h('div', { class: 'spacer' }),
-      notes,
-      h('div', { class: 'spacer' }),
-      defWrap, speedWrap));
+  const fieldBox = h('div', { class: 'hd-field' }, svg, result);
+  const topBar = h('header', { class: 'hd-top' },
+    h('div', { class: 'hd-heading' }, title, sub),
+    h('div', { class: 'spacer' }),
+    counter,
+    iconBtn('x', close, { title: 'Close huddle mode', cls: 'big' }));
+  const bottomBar = h('footer', { class: 'hd-bottom' },
+    prevBtn, playBtn, nextBtn,
+    h('div', { class: 'spacer' }),
+    notes,
+    h('div', { class: 'spacer' }),
+    defWrap, speedWrap);
+
+  const overlay = h('div', { class: 'huddle' }, topBar, fieldBox, bottomBar);
 
   function renderControls() {
     speedWrap.replaceChildren(segmented([{ value: 0.5, label: '½×' }, { value: 1, label: '1×' }, { value: 1.5, label: '1½×' }], stage.speed,
@@ -55,6 +67,42 @@ export function openHuddle(playIds, startIndex = 0) {
     defWrap.replaceChildren(segmented([{ value: true, label: 'Defense' }, { value: false, label: 'Routes only' }], showDefense,
       (v) => { showDefense = v; renderControls(); load(); }, { cls: 'small' }));
   }
+
+  // Zoom the view to the play so it fills the screen: the field always spans the
+  // full width, and the action is centred in the strip between the floating
+  // title and controls so nothing important hides under them.
+  let bounds = { yMin: -8, yMax: 15 };
+  function fitView() {
+    const vbW = W + PAD_X * 2;
+    const maxSpan = HUDDLE_VIEW.yMax - HUDDLE_VIEW.yMin;
+    const lo = bounds.yMin - PAD_Y;
+    const hi = bounds.yMax + PAD_Y;
+    const contentSpan = Math.min(Math.max(MIN_SPAN, hi - lo), maxSpan);
+    const mid = (lo + hi) / 2;
+    const box = fieldBox.getBoundingClientRect();
+    if (!box.width || !box.height) {
+      svg.setAttribute('viewBox', `${-PAD_X} ${-(mid + contentSpan / 2)} ${vbW} ${contentSpan}`);
+      return;
+    }
+    // Never let the chrome eat more than half the screen.
+    let top = topBar.offsetHeight * CHROME_RESERVE;
+    let bot = bottomBar.offsetHeight * CHROME_RESERVE;
+    const over = (box.height * 0.5) / Math.max(1, top + bot);
+    if (over < 1) { top *= over; bot *= over; }
+    const fit = Math.min(box.width / vbW, (box.height - top - bot) / contentSpan);
+    const span = Math.min(box.height / fit, maxSpan, MAX_SPAN);
+    // Mirror how the SVG itself scales and centres the view, then aim the middle
+    // of the action at the middle of the clear strip.
+    const scale = Math.min(box.width / vbW, box.height / span);
+    const slack = (box.height - span * scale) / 2;
+    const aim = top + (box.height - top - bot) / 2;
+    const viewTop = clamp(mid + (aim - slack) / scale, HUDDLE_VIEW.yMin + span, HUDDLE_VIEW.yMax);
+    svg.setAttribute('viewBox', `${-PAD_X} ${-viewTop} ${vbW} ${span}`);
+  }
+
+  const ro = window.ResizeObserver ? new ResizeObserver(fitView) : null;
+  ro?.observe(fieldBox);
+  window.addEventListener('resize', fitView);
 
   let resultKey = '';
   function onStage(st) {
@@ -82,6 +130,8 @@ export function openHuddle(playIds, startIndex = 0) {
     resultKey = '';
     result.hidden = true;
     stage.load(shown, simContext(play));
+    bounds = simBounds(stage.sim);
+    fitView();
     stage.play();
   }
 
@@ -116,6 +166,8 @@ export function openHuddle(playIds, startIndex = 0) {
 
   function close() {
     stage.destroy();
+    ro?.disconnect();
+    window.removeEventListener('resize', fitView);
     document.removeEventListener('keydown', onKey);
     wakeLock?.release?.().catch(() => {});
     overlay.classList.remove('open');
