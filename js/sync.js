@@ -121,10 +121,17 @@ export function decodePairing(text) {
 
 // ---------- Transport ----------
 
+// Supabase is retiring the long `eyJ…` anon keys in favour of `sb_publishable_…`
+// ones, which are not JWTs — sending those as a bearer token fails, since
+// anything trying to verify one as a JWT rejects it. The apikey header carries
+// either kind, so only the old style also goes out as a bearer token. A team set
+// up with either key works, today and after the switch.
+const isJwtKey = (key) => /^eyJ/.test(key || '');
+
 function headers(extra = {}) {
   return {
     apikey: cfg.key,
-    Authorization: `Bearer ${cfg.key}`,
+    ...(isJwtKey(cfg.key) ? { Authorization: `Bearer ${cfg.key}` } : {}),
     // Lets the store's row policy check the caller is asking for its own team.
     'x-team-code': cfg.team,
     ...extra,

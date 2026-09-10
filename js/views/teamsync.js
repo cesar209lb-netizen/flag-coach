@@ -113,7 +113,7 @@ const toneOf = (s) => (s.state === 'error' ? 'no' : s.state === 'idle' && !s.pen
 
 function setupSheet(onDone) {
   const url = h('input', { class: 'input', placeholder: 'https://abcdefgh.supabase.co', autocomplete: 'off', spellcheck: 'false' });
-  const key = h('input', { class: 'input', placeholder: 'eyJhbGciOi… (the anon public key)', autocomplete: 'off', spellcheck: 'false' });
+  const key = h('input', { class: 'input', placeholder: 'sb_publishable_… or eyJhbGciOi…', autocomplete: 'off', spellcheck: 'false' });
   const sql = h('textarea', { class: 'input code', rows: 8, readonly: true, spellcheck: 'false' }, sync.SETUP_SQL);
   const err = h('div', { class: 'p-help bad', hidden: true });
 
@@ -125,7 +125,7 @@ function setupSheet(onDone) {
       h('ol', { class: 'steps' },
         h('li', null, h('b', null, 'Make a free store.'), ' Sign up at ', h('a', { href: STORE_HELP, target: '_blank', rel: 'noopener' }, 'supabase.com'), ' and create a project. Any region, free plan.'),
         h('li', null, h('b', null, 'Run this once.'), ' In that project open SQL Editor, paste the block below and press Run. It makes the table the app syncs through.'),
-        h('li', null, h('b', null, 'Copy two values.'), ' In the project’s Settings → API, copy the Project URL and the ', h('b', null, 'anon public'), ' key into the boxes below.')),
+        h('li', null, h('b', null, 'Copy two values.'), ' Press ', h('b', null, 'Connect'), ' at the top of the project — it shows the Project URL and the ', h('b', null, 'publishable'), ' key. Copy both into the boxes below. An older project may call the key ', h('b', null, 'anon public'), ' instead; either works.')),
       h('div', { class: 'btn-row tight pad' },
         btn('Copy the SQL', async () => {
           try { await navigator.clipboard.writeText(sync.SETUP_SQL); toast('SQL copied'); } catch { sql.select(); }
