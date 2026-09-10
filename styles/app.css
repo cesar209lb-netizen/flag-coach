@@ -577,7 +577,13 @@ textarea.input { resize: vertical; line-height: 1.45; }
   bottom: 0; gap: 12px;
   padding: 22px calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 16px);
   background: linear-gradient(to top, rgba(3, 12, 6, .82), rgba(3, 12, 6, .5) 55%, rgba(3, 12, 6, 0));
+  transition: opacity .25s ease;
 }
+/* While a play is running the controls fade out so only the play is on screen.
+   Tap the field to pause and bring them back. Opacity rather than display so
+   the bar keeps its height and fitView does not reframe the field mid-play. */
+.huddle.running .hd-bottom { opacity: 0; }
+.huddle.running .hd-bottom button, .huddle.running .hd-bottom .seg { pointer-events: none; }
 .hd-title { font-size: 30px; font-weight: 850; line-height: 1.05; text-shadow: 0 2px 8px rgba(0, 0, 0, .55); }
 .hd-sub { color: #bfe0c8; font-weight: 650; text-shadow: 0 1px 6px rgba(0, 0, 0, .55); }
 .hd-counter { font-family: var(--round); font-weight: 800; color: #cfe3d4; font-size: 18px; }

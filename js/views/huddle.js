@@ -40,7 +40,7 @@ export function openHuddle(playIds, startIndex = 0) {
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.innerHTML = `<g>${fieldMarkup(W, { view: HUDDLE_VIEW, rushDistance: state.settings.rushDistance, pad: PAD_X })}</g><g></g>`;
   let focus = prefFocus.get();
-  const stage = new PlayStage(svg.children[1], { loop: true, r: 1.3, onUpdate: onStage, focus: focus || null });
+  const stage = new PlayStage(svg.children[1], { loop: false, r: 1.3, onUpdate: onStage, focus: focus || null });
   stage.speed = huddleSpeed;
 
   const title = h('div', { class: 'hd-title' });
@@ -48,7 +48,7 @@ export function openHuddle(playIds, startIndex = 0) {
   const counter = h('div', { class: 'hd-counter' });
   const notes = h('div', { class: 'hd-notes' });
   const result = h('div', { class: 'hd-result', hidden: true });
-  const playBtn = h('button', { class: 'play-btn big', onclick: () => stage.toggle(), 'aria-label': 'Play or pause' }, icon('pause'));
+  const playBtn = h('button', { class: 'play-btn big', onclick: () => stage.toggle(), 'aria-label': 'Play or pause' }, icon('play'));
   const prevBtn = iconBtn('back', () => go(-1), { title: 'Previous play', cls: 'big' });
   const nextBtn = iconBtn('next', () => go(1), { title: 'Next play', cls: 'big' });
   const speedWrap = h('div');
@@ -151,6 +151,7 @@ export function openHuddle(playIds, startIndex = 0) {
   let resultKey = '';
   function onStage(st) {
     playBtn.replaceChildren(icon(st.playing ? 'pause' : 'play'));
+    overlay.classList.toggle('running', st.playing);
     const r = st.sim.result;
     const show = r && r.kind !== 'none' && st.t >= r.t && showDefense;
     const key = show ? r.title : '';
@@ -182,11 +183,11 @@ export function openHuddle(playIds, startIndex = 0) {
     nextBtn.disabled = index === ids.length - 1;
     resultKey = '';
     result.hidden = true;
+    stage.pause();
     stage.load(shown, ctx);
     bounds = simBounds(stage.sim);
     fitView();
     renderControls();
-    stage.play();
   }
 
   function go(d) {
