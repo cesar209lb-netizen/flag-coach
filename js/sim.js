@@ -118,6 +118,26 @@ function closestApproach(a, b, from) {
 
 // ---------- Defense ----------
 
+// Bunched or stacked receivers put their man defenders on the same spot, where
+// they hide each other and read as a missing defender. Fan them apart along the
+// line, keeping the group centred and each defender's own cushion.
+const FAN_GAP = 1.7;
+function fanOut(men, W) {
+  if (men.length < 2) return;
+  const order = [...men].sort((a, b) => a.x - b.x);
+  const ideal = order.map((d) => d.x);
+  for (let i = 1; i < order.length; i++) {
+    if (order[i].x - order[i - 1].x < FAN_GAP) order[i].x = order[i - 1].x + FAN_GAP;
+  }
+  // Slide the fanned group back so it stays centred on where it started.
+  const drift = order.reduce((t, d, i) => t + (d.x - ideal[i]), 0) / order.length;
+  order.forEach((d, i) => {
+    d.x = clamp(d.x - drift, 1, W - 1);
+    // The pre-snap goal keeps this offset, so shadowing motion stays legible.
+    d.fan = d.x - ideal[i];
+  });
+}
+
 // Where the defense lines up, given the offense's pre-snap spots. Pure: no
 // simulation, cheap enough to call on every drag frame in the play designer.
 // `spots` is [{slot, x, y}] for the whole offense.
@@ -143,16 +163,17 @@ export function alignDefense(spots, def, ctx) {
     defs.push({ kind: 'rush', spot, x: spot, y: ctx.rushDistance, vx: 0, vy: 0, speed: RUSH_SPEED });
   }
   if (cov === 'man') {
-    for (const s of spots) {
-      if (s.slot === 'QB') continue;
+    const cushion = Math.max(0.8, look.cushion);
+    const men = spots.filter((s) => s.slot !== 'QB').map((s) => {
       const inside = Math.sign(W / 2 - s.x) || 1;
       const shade = look.shade === 'outside' ? -inside : inside;
-      const cushion = Math.max(0.8, look.cushion);
-      defs.push({
-        kind: 'man', target: s.slot, shade, cushion,
+      return {
+        kind: 'man', target: s.slot, shade, cushion, fan: 0,
         x: clamp(s.x + shade * 0.8, 1, W - 1), y: cushion, vx: 0, vy: 0, speed: DEF_SPEED,
-      });
-    }
+      };
+    });
+    fanOut(men, W);
+    defs.push(...men);
     if (!rush) defs.push(zone(W / 2, 9));
   } else if (cov === 'zone22') {
     defs.push(zone(W * 0.27, 5), zone(W * 0.73, 5), zone(W * 0.3, 13, true), zone(W * 0.7, 13, true));
@@ -280,7 +301,7 @@ export function simulate(play, ctx) {
       let goal, maxS = d.speed, acc = 13;
       if (t < 0) {
         maxS = 3.5;
-        if (d.kind === 'man') { const tp = off[idx[d.target]]; goal = { x: tp.x + d.shade * 0.8, y: d.cushion }; }
+        if (d.kind === 'man') { const tp = off[idx[d.target]]; goal = { x: tp.x + d.shade * 0.8 + d.fan, y: d.cushion }; }
         else if (d.kind === 'zone') goal = d.pre;
         else goal = { x: d.spot, y: ctx.rushDistance };
       } else if (result && ball.mode !== 'held') {
