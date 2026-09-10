@@ -1,10 +1,11 @@
-// Roster: player cards, trading-card view, editor, returning players.
+// Roster: player cards with photos, trading-card view, editor, returning players.
 
 import { h, icon, iconBtn, btn, openSheet, confirmDialog, toast, initials } from '../ui.js';
 import {
   state, subscribe, activeSeason, rosterFor, playerById, entryFor, savePlayer, deletePlayer, saveSeason, saveSettings,
 } from '../store.js';
-import { POSITIONS, RATINGS, JERSEY_SIZES, newPlayer, newRosterEntry, overall } from '../model.js';
+import { POSITIONS, RATINGS, newPlayer, newRosterEntry, overall } from '../model.js';
+import { pickImage, squarePhoto } from '../photo.js';
 
 export function mount(root) {
   const render = () => root.replaceChildren(build());
@@ -32,14 +33,14 @@ function build() {
       : h('div', { class: 'empty-state' },
         h('div', { class: 'empty-icon' }, icon('users')),
         h('h3', null, 'No players yet'),
-        h('p', null, 'Add your players so their names show up on the field in your plays.'),
+        h('p', null, 'Add your players with a photo so they show up on the field in your plays.'),
         btn('Add your first player', () => openPlayerEditor(), { kind: 'primary', iconName: 'plus' })));
 }
 
 function playerCard(player, entry) {
   return h('button', { class: 'player-card', onclick: () => openPlayerCard(player.id) },
     h('div', { class: 'pc-photo' },
-      h('span', { class: 'pc-initials' }, initials(player)),
+      player.photo ? h('img', { src: player.photo, alt: '' }) : h('span', { class: 'pc-initials' }, initials(player)),
       entry.number ? h('span', { class: 'pc-num' }, `#${entry.number}`) : null),
     h('div', { class: 'pc-info' },
       h('div', { class: 'pc-name' }, player.first),
@@ -67,7 +68,7 @@ export function openPlayerCard(playerId) {
   const entry = entryFor(playerId, season) || lastEntryFor(playerId)?.entry || newRosterEntry(playerId);
   const seasons = state.seasons.filter((s) => s.roster.some((r) => r.playerId === playerId)).map((s) => s.name);
   const info = [
-    ['Jersey size', entry.jerseySize], ['Seasons', seasons.join(', ')],
+    ['Seasons', seasons.join(', ')],
   ].filter(([, v]) => v);
 
   const card = h('div', { class: 'tcard', onclick: () => card.classList.toggle('flipped') },
@@ -76,7 +77,7 @@ export function openPlayerCard(playerId) {
         h('div', { class: 'tc-top' },
           h('div', { class: 'tc-ovr' }, h('b', null, overall(entry.ratings)), h('small', null, 'OVR')),
           h('div', { class: 'tc-num' }, entry.number ? `#${entry.number}` : '')),
-        h('div', { class: 'tc-photo' }, initials(player)),
+        h('div', { class: 'tc-photo' }, player.photo ? h('img', { src: player.photo, alt: '' }) : initials(player)),
         h('div', { class: 'tc-name' }, h('b', null, player.first)),
         h('div', { class: 'tc-pos' }, entry.positions.join(' · ') || 'Player'),
         h('div', { class: 'tc-team' }, `${state.settings.teamName} · ${season.name}`)),
@@ -114,10 +115,29 @@ export function openPlayerEditor(playerId = null) {
     return el;
   };
 
+  const photoBox = h('div', { class: 'photo-box' });
+  const renderPhoto = () => photoBox.replaceChildren(
+    h('button', { class: 'photo-pick', onclick: choosePhoto, 'aria-label': 'Choose photo' },
+      player.photo ? h('img', { src: player.photo, alt: '' }) : h('div', { class: 'photo-empty' }, icon('camera'), h('span', null, 'Add photo'))),
+    player.photo
+      ? h('div', { class: 'btn-row center' },
+        btn('Change', choosePhoto, { kind: 'small ghost' }),
+        btn('Remove', () => { player.photo = null; renderPhoto(); }, { kind: 'small ghost danger-text' }))
+      : h('p', { class: 'p-help center' }, 'Take a photo or pick one from your library'));
+  async function choosePhoto() {
+    const file = await pickImage();
+    if (!file) return;
+    try {
+      player.photo = await squarePhoto(file);
+      renderPhoto();
+    } catch {
+      toast("Couldn't read that photo", { tone: 'bad' });
+    }
+  }
+  renderPhoto();
+
   const first = text(player, 'first', { placeholder: 'First name' });
   const number = text(entry, 'number', { placeholder: '#', inputMode: 'numeric', maxLength: 3 });
-  const jersey = h('select', { class: 'input select', onchange: (e) => { entry.jerseySize = e.target.value; } },
-    h('option', { value: '' }, 'Size'), JERSEY_SIZES.map((s) => h('option', { value: s, selected: entry.jerseySize === s }, s)));
 
   const posWrap = h('div', { class: 'chip-grid' });
   const renderPos = () => posWrap.replaceChildren(...POSITIONS.map((p) => h('button', {
@@ -142,13 +162,14 @@ export function openPlayerEditor(playerId = null) {
   const sheet = openSheet({
     title: isNew ? 'Add Player' : `Edit ${player.first}`, size: 'lg',
     body: h('div', null,
-      h('div', null,
-        h('div', { class: 'form-row three' },
-          h('label', { class: 'field-label' }, 'First name', first),
-          h('label', { class: 'field-label' }, 'Jersey #', number),
-          h('label', { class: 'field-label' }, 'Jersey size', jersey)),
-        h('p', { class: 'p-help' }, 'First name and number only. The roster syncs to your team store, so it deliberately keeps nothing else about a player.'),
-        h('div', { class: 'field-label' }, 'Positions'), posWrap),
+      h('div', { class: 'pe-grid' },
+        photoBox,
+        h('div', null,
+          h('div', { class: 'form-row' },
+            h('label', { class: 'field-label' }, 'First name', first),
+            h('label', { class: 'field-label' }, 'Jersey #', number)),
+          h('p', { class: 'p-help' }, 'First name, number and photo. The roster syncs to your team store, so it deliberately keeps nothing else about a player — no surname, contact or medical note.'),
+          h('div', { class: 'field-label' }, 'Positions'), posWrap)),
       h('div', { class: 'pe-section-title' }, 'Ratings ', h('span', { class: 'ovr-chip' }, 'OVR ', ovrEl)),
       h('div', { class: 'ratings-grid' }, RATINGS.map(ratingRow)),
       !isNew ? h('div', { class: 'danger-zone' },
@@ -160,7 +181,7 @@ export function openPlayerEditor(playerId = null) {
           toast(`${player.first} removed from ${season.name}`);
         }, { kind: 'ghost' }) : null,
         btn('Delete player forever', async () => {
-          if (!(await confirmDialog({ title: `Delete ${player.first}?`, message: 'This removes them from every season. This cannot be undone.', confirmText: 'Delete forever', danger: true }))) return;
+          if (!(await confirmDialog({ title: `Delete ${player.first}?`, message: 'This removes them from every season and deletes their photo. This cannot be undone.', confirmText: 'Delete forever', danger: true }))) return;
           await deletePlayer(player.id);
           sheet.close();
           toast('Player deleted');
@@ -199,7 +220,7 @@ function openReturning() {
         const last = lastEntryFor(p.id);
         return h('label', { class: 'check-row' },
           h('input', { type: 'checkbox', onchange: (e) => (e.target.checked ? chosen.add(p.id) : chosen.delete(p.id)) }),
-          h('span', { class: 'mini-av' }, initials(p)),
+          p.photo ? h('img', { class: 'mini-av', src: p.photo, alt: '' }) : h('span', { class: 'mini-av' }, initials(p)),
           h('span', { class: 'grow' }, p.first),
           last ? h('span', { class: 'muted small' }, last.season.name) : null);
       }))),

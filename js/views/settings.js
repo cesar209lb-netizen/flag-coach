@@ -75,7 +75,7 @@ function build(rerender = () => {}) {
       h('div', { class: 'set-title' }, 'Backup & restore'),
       row('Last backup', s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString() : 'Your plays and roster only live on this device',
         h('span', { class: `status ${backupAge < 7 * 864e5 ? 'ok' : 'no'}` }, timeAgo(s.lastBackupAt))),
-      h('p', { class: 'p-help pad' }, 'Save a backup file to iCloud Drive (or AirDrop it to your Mac) every week or two. If this device is lost or reset, restoring the file brings back everything — plays, roster and seasons.'),
+      h('p', { class: 'p-help pad' }, 'Save a backup file to iCloud Drive (or AirDrop it to your Mac) every week or two. If this device is lost or reset, restoring the file brings back everything — plays, roster, photos and seasons.'),
       h('div', { class: 'set-row' },
         h('div', { class: 'btn-row tight' },
           btn('Save backup', saveBackup, { iconName: 'share', kind: 'primary' }),
@@ -98,7 +98,7 @@ function build(rerender = () => {}) {
       h('div', { class: 'set-title' }, 'About'),
       row('Flag Coach', `Version ${APP_VERSION} · everything stays on this device`, icon('shield')),
       h('div', { class: 'set-row' }, btn('Erase all data', async () => {
-        if (!(await confirmDialog({ title: 'Erase everything?', message: 'All plays, players and seasons on this device will be deleted. Save a backup first if you might want them back.', confirmText: 'Continue', danger: true }))) return;
+        if (!(await confirmDialog({ title: 'Erase everything?', message: 'All plays, players, photos and seasons on this device will be deleted. Save a backup first if you might want them back.', confirmText: 'Continue', danger: true }))) return;
         if (!(await confirmDialog({ title: 'Are you sure?', message: isOn() ? 'This cannot be undone. Team sync also stops on this device, so the team’s copy is left alone.' : 'This cannot be undone.', confirmText: 'Erase everything', danger: true }))) return;
         if (isOn()) await unpair();
         await eraseEverything();

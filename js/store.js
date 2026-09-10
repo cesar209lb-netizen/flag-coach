@@ -130,12 +130,12 @@ const upsert = (arr, obj) => {
   if (i >= 0) arr[i] = obj; else arr.push(obj);
 };
 
-// The roster once held surnames, photos, parent contacts and medical notes. All
-// of it synced to the team store, and none of it belongs on the internet for a
-// child, so any record still carrying those fields is rewritten on load. The
+// The roster once held surnames, parent contacts and medical notes. All of it
+// synced to the team store, and none of it belongs on the internet for a child,
+// so any record still carrying those fields is rewritten on load. The
 // rewrite is queued like any other edit, which clears the old copy from the
 // store as well as this device.
-const RETIRED_FIELDS = ['last', 'nickname', 'photo', 'parentName', 'parentPhone', 'medical', 'notes'];
+const RETIRED_FIELDS = ['last', 'nickname', 'parentName', 'parentPhone', 'medical', 'notes'];
 
 async function stripPersonalFields(players) {
   return Promise.all(players.map(async (p) => {
@@ -231,13 +231,13 @@ export function rosterFor(season = activeSeason()) {
 
 export const entryFor = (playerId, season = activeSeason()) => season?.roster.find((r) => r.playerId === playerId) || null;
 
-// Info used to draw a player on the field (number, first name, ratings).
+// Info used to draw a player on the field (photo, number, first name, ratings).
 export function tokenInfo(playerId) {
   if (!playerId) return {};
   const p = playerById(playerId);
   if (!p) return {};
   const e = entryFor(playerId);
-  return { number: e?.number || '', first: p.first, ratings: e?.ratings };
+  return { photo: p.photo, number: e?.number || '', first: p.first, ratings: e?.ratings };
 }
 
 export async function savePlayer(player, { silent = false } = {}) {

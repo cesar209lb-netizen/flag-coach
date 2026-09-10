@@ -88,7 +88,7 @@ function build() {
         roster.length
           ? h('div', { class: 'avatar-wrap' }, roster.map(({ player, entry }) =>
             h('button', { class: 'avatar-btn', onclick: () => openPlayerCard(player.id), title: player.first },
-              h('span', { class: 'avatar' }, initials(player)),
+              player.photo ? h('img', { class: 'avatar', src: player.photo, alt: '' }) : h('span', { class: 'avatar' }, initials(player)),
               h('span', { class: 'avatar-label' }, entry.number ? `#${entry.number}` : player.first))))
           : h('div', null, h('p', { class: 'p-help' }, 'No players yet.'), btn('Add a player', () => openPlayerEditor(), { kind: 'small ghost', iconName: 'plus' }))),
       h('section', { class: 'card' },

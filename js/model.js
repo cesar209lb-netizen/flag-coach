@@ -19,7 +19,6 @@ export const RATINGS = [
   { key: 'throwing', label: 'Throwing' },
   { key: 'iq', label: 'Football IQ' },
 ];
-export const JERSEY_SIZES = ['YS', 'YM', 'YL', 'YXL', 'AS', 'AM', 'AL', 'AXL'];
 export const DEFAULT_TAGS = ['Quick Pass', 'Deep Shot', 'Run', 'Red Zone', 'Short Yardage', 'Trick Play', 'Extra Point'];
 
 export const COVERAGES = [
@@ -78,16 +77,16 @@ export function seasonNameFor(date = new Date()) {
 
 export const newSeason = (name) => ({ id: uid(), name, createdAt: Date.now(), roster: [] });
 
-// Deliberately minimal: a first name and, on the roster entry, a jersey number.
-// No surname, photo, contact or medical field — this syncs to a store on the
-// internet, and none of that belongs there for a child.
+// Deliberately minimal: a first name, a photo, and the jersey number on the
+// season entry. No surname, contact or medical field — this syncs to a store on
+// the internet, and none of that belongs there for a child.
 export const newPlayer = () => ({
-  id: uid(), first: '',
+  id: uid(), first: '', photo: null,
   createdAt: Date.now(), updatedAt: Date.now(),
 });
 
 export const newRosterEntry = (playerId) => ({
-  playerId, number: '', positions: [], jerseySize: '',
+  playerId, number: '', positions: [],
   ratings: { speed: 3, hands: 3, routes: 3, flags: 3, throwing: 3, iq: 3 },
 });
 
