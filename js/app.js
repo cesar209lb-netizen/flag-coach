@@ -1,6 +1,7 @@
 // App shell: boot, hash router, tab bar, offline service worker.
 
 import { loadState } from './store.js';
+import * as sync from './sync.js';
 import { h, icon, toast } from './ui.js';
 import * as Home from './views/home.js';
 import * as Playbook from './views/playbook.js';
@@ -80,6 +81,11 @@ async function boot() {
     return;
   }
   navigator.storage?.persist?.().catch(() => {});
+  // Team sync is off until an iPad is paired in Settings.
+  try {
+    await sync.loadConfig();
+    if (sync.isOn()) { sync.start(); sync.sync({ quiet: true }); }
+  } catch (e) { console.warn('Sync unavailable', e); }
   window.addEventListener('hashchange', route);
   if (!location.hash || location.hash === '#') history.replaceState(null, '', '#/home');
   route();

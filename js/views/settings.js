@@ -4,20 +4,23 @@ import { h, icon, iconBtn, btn, openSheet, confirmDialog, promptDialog, toast, s
 import { state, subscribe, activeSeason, saveSettings, saveSeason, deleteSeason, eraseEverything } from '../store.js';
 import { newSeason, seasonNameFor } from '../model.js';
 import { saveBackup, restoreBackup } from '../backup.js';
+import { onStatus, unpair, isOn } from '../sync.js';
+import { teamSyncSection } from './teamsync.js';
 
 export const APP_VERSION = '1.0';
 
 export function mount(root) {
-  const render = () => root.replaceChildren(build());
+  const render = () => root.replaceChildren(build(render));
   render();
   const unsub = subscribe(render);
-  return { destroy: unsub };
+  const unsubSync = onStatus(render);
+  return { destroy: () => { unsub(); unsubSync(); } };
 }
 
 const row = (label, sub, control) => h('div', { class: 'set-row' },
   h('div', { class: 'set-label' }, h('b', null, label), sub ? h('span', null, sub) : null), control);
 
-function build() {
+function build(rerender = () => {}) {
   const s = state.settings;
   const active = activeSeason();
 
@@ -63,6 +66,8 @@ function build() {
       row('Rusher distance', 'How far off the line the rusher starts', stepper(s.rushDistance, { min: 3, max: 15, suffix: ' yds', onChange: (v) => saveSettings({ rushDistance: v }, { silent: true }) })),
       row('Field width', 'Sideline to sideline. Existing plays keep their spots.', stepper(s.fieldWidth, { min: 20, max: 40, suffix: ' yds', onChange: (v) => saveSettings({ fieldWidth: v }, { silent: true }) }))),
 
+    teamSyncSection(row, rerender),
+
     h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'Backup & restore'),
       row('Last backup', s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString() : 'Your plays and roster only live on this iPad',
@@ -91,7 +96,8 @@ function build() {
       row('Flag Coach', `Version ${APP_VERSION} · everything stays on this iPad`, icon('shield')),
       h('div', { class: 'set-row' }, btn('Erase all data', async () => {
         if (!(await confirmDialog({ title: 'Erase everything?', message: 'All plays, players, photos and seasons on this iPad will be deleted. Save a backup first if you might want them back.', confirmText: 'Continue', danger: true }))) return;
-        if (!(await confirmDialog({ title: 'Are you sure?', message: 'This cannot be undone.', confirmText: 'Erase everything', danger: true }))) return;
+        if (!(await confirmDialog({ title: 'Are you sure?', message: isOn() ? 'This cannot be undone. Team sync also stops on this iPad, so the team’s copy is left alone.' : 'This cannot be undone.', confirmText: 'Erase everything', danger: true }))) return;
+        if (isOn()) await unpair();
         await eraseEverything();
         toast('All data erased');
       }, { kind: 'ghost danger-text', iconName: 'trash' }))));

@@ -1,8 +1,13 @@
-// Thin promise wrapper around IndexedDB. Everything lives on the device.
+// Thin promise wrapper around IndexedDB. Everything lives on the device;
+// js/sync.js optionally mirrors it to a shared team store.
 
 const NAME = 'flagcoach';
-const VERSION = 1;
+const VERSION = 2;
+// The stores that hold team content: what backups carry and what sync mirrors.
 export const STORES = ['meta', 'players', 'seasons', 'plays'];
+// Sync bookkeeping. Kept out of STORES so a restore or erase leaves the
+// device's pairing alone.
+export const SYNC_STORES = ['pending', 'tombstones', 'sync'];
 
 let dbPromise = null;
 
@@ -12,7 +17,10 @@ export function open() {
     const req = indexedDB.open(NAME, VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      for (const s of STORES) if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: 'id' });
+      // Only ever adds stores, so upgrading an existing iPad keeps its data.
+      for (const s of [...STORES, ...SYNC_STORES]) {
+        if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: 'id' });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -36,6 +44,15 @@ export async function getAll(store) {
   });
 }
 
+export async function get(store, id) {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const r = db.transaction(store).objectStore(store).get(id);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+
 export async function put(store, value) {
   const db = await open();
   const tx = db.transaction(store, 'readwrite');
@@ -43,10 +60,26 @@ export async function put(store, value) {
   return done(tx);
 }
 
+export async function putAll(store, values) {
+  if (!values.length) return;
+  const db = await open();
+  const tx = db.transaction(store, 'readwrite');
+  for (const v of values) tx.objectStore(store).put(v);
+  return done(tx);
+}
+
 export async function del(store, id) {
   const db = await open();
   const tx = db.transaction(store, 'readwrite');
   tx.objectStore(store).delete(id);
+  return done(tx);
+}
+
+export async function delAll(store, ids) {
+  if (!ids.length) return;
+  const db = await open();
+  const tx = db.transaction(store, 'readwrite');
+  for (const id of ids) tx.objectStore(store).delete(id);
   return done(tx);
 }
 

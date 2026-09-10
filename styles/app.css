@@ -591,6 +591,14 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .huddle .icon-btn.big { background: rgba(6, 20, 10, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .huddle .seg { background: rgba(3, 12, 6, .6); border-color: rgba(255, 255, 255, .14); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 
+/* ---------- Team sync ---------- */
+.input.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.5;
+  word-break: break-all; white-space: pre-wrap;
+}
+.p-help.bad { color: #fca5a5; }
+.steps a { color: var(--accent); }
+
 /* ---------- Responsive ---------- */
 @media (orientation: portrait), (max-width: 900px) {
   .ed-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(260px, 40%); }

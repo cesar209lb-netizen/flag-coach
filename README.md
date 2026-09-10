@@ -1,6 +1,6 @@
 # Flag Coach
 
-A 5v5 flag football coaching app for iPad: playbook with a route designer and play animation, roster with photos, huddle mode, and backups. Plain HTML/CSS/JavaScript — no build step, no accounts, no server. All data stays on the iPad (IndexedDB) and the app works offline once installed.
+A 5v5 flag football coaching app for iPad: playbook with a route designer and play animation, roster with photos, huddle mode, and backups. Plain HTML/CSS/JavaScript — no build step, no accounts. Data lives on the iPad (IndexedDB) and the app works offline once installed. Optional team sync shares one playbook across two iPads through a free store you own.
 
 ## Run it on the Mac
 
@@ -19,6 +19,44 @@ Open http://localhost:8080. The dev server disables caching so edits show up on 
 3. On the iPad, open the `https://<you>.github.io/<repo>/` address in Safari, tap **Share → Add to Home Screen**.
 4. Open it once from the Home Screen while online. After that it works with no internet.
 5. Test: turn on Airplane Mode and open the app.
+
+## Sharing a playbook with another coach (team sync)
+
+Two iPads can share one playbook. It is off by default — nothing leaves a
+device until you turn it on.
+
+**On the iPad that has the playbook**
+
+1. Make the free store both iPads talk to: sign up at
+   [supabase.com](https://supabase.com/dashboard), create a project (any region,
+   free plan).
+2. In that project: **SQL Editor** → paste the block shown in the app
+   (Settings → Team sync → Set up team sync → *Copy the SQL*) → **Run**.
+3. In the project: **Settings → API** → copy the **Project URL** and the
+   **anon public** key into the app, then tap **Start syncing**. This iPad's
+   plays, roster, photos and rules go up.
+4. Tap **Invite a device** and AirDrop or text the team code to the other coach.
+
+**On the other iPad**
+
+Settings → Team sync → **Join a team** → paste the code. That iPad takes the
+team's copy (its own plays are replaced — save a backup first if it has any),
+and from then on both stay in step.
+
+**How it behaves**
+
+- Edits go up a few seconds after you make them, and each iPad pulls every 30
+  seconds, when it comes back online, and when you reopen the app.
+- Offline still works. Changes queue on the iPad and go up next time it has
+  internet.
+- If two people change the same play, the most recent edit wins. Deletes travel
+  too, so removing a play on one iPad removes it on the other.
+- The team code is the key to the team: anyone holding it can read and change
+  the plays and roster, which include player names and photos. Send it directly
+  to the person, don't post it anywhere public, and note that the URL and key
+  live only on the paired iPads — they are never part of the app's public files.
+- **Stop syncing** unpairs one iPad and leaves everything it has in place.
+  Backups keep working exactly as before, synced or not.
 
 ## Updating the app
 
