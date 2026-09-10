@@ -1,0 +1,6 @@
+.DS_Store
+*.log
+
+# Local team data exports (contain player names)
+FlagCoach-*.json
+text*.txt
