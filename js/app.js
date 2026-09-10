@@ -9,14 +9,16 @@ import * as Playbook from './views/playbook.js';
 import * as Editor from './views/editor.js';
 import * as Roster from './views/roster.js';
 import * as Settings from './views/settings.js';
+import * as RouteLab from './views/routelab.js';
 
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'playbook', label: 'Playbook', icon: 'playbook' },
+  { id: 'routes', label: 'Routes', icon: 'route' },
   { id: 'roster', label: 'Roster', icon: 'users', coachOnly: true },
   { id: 'settings', label: 'Settings', icon: 'sliders' },
 ];
-const VIEWS = { home: Home, playbook: Playbook, roster: Roster, settings: Settings };
+const VIEWS = { home: Home, playbook: Playbook, routes: RouteLab, roster: Roster, settings: Settings };
 
 const viewEl = document.getElementById('view');
 const tabbar = document.getElementById('tabbar');

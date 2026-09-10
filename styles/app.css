@@ -605,6 +605,24 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .hd-focus { display: flex; align-items: center; gap: 8px; }
 .hd-focus-label { color: #cfe3d4; font-size: 13px; font-weight: 700; text-shadow: 0 1px 6px rgba(0, 0, 0, .6); }
 
+/* ---------- Route lab ---------- */
+.lab .page-head .count { display: block; margin-top: 2px; }
+.lab-field {
+  /* The drill field is taller than it is wide, so cap the width on a big
+     screen rather than pad it out with empty sideline. */
+  position: relative; height: min(56vh, 560px); margin: 10px auto 12px; max-width: 640px;
+  border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #1a5424;
+}
+.lab-field svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.lab-bar { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.lab-readout { min-width: 0; }
+.lab-route { display: flex; align-items: baseline; gap: 8px; }
+.lab-route b { font-size: 19px; font-weight: 800; }
+.lab-route span { color: var(--muted); font-size: 13px; font-weight: 650; }
+.lab-caption { color: var(--dim); font-size: 13px; margin-top: 2px; }
+.lab-caption.warn { color: #fca5a5; }
+.chip-grid.routes { display: flex; flex-wrap: wrap; gap: 8px; }
+
 /* ---------- Responsive ---------- */
 @media (orientation: portrait), (max-width: 900px) {
   .ed-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(260px, 40%); }

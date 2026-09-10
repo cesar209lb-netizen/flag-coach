@@ -20,6 +20,15 @@ Open http://localhost:8080. The dev server disables caching so edits show up on 
 4. Open it once from the Home Screen while online. After that it works with no internet.
 5. Test: turn on Airplane Mode and open the app.
 
+## Route lab
+
+The **Routes** tab is a standalone drill: one QB, one receiver, and a route.
+Drag either player anywhere, tap a route, and press play. The throw is timed so
+the ball arrives where the route finishes — a go ball goes deep, a hitch is
+thrown at the hitch — and the readout gives the depth and where it was caught.
+Out, corner and flat break toward the nearest sideline, so **Flip** or dragging
+across the field runs them the other way. Nothing here touches the playbook.
+
 ## Sharing a playbook with another coach (team sync)
 
 Two iPads can share one playbook. It is off by default — nothing leaves a
@@ -59,8 +68,9 @@ able to change anything, and without seeing the roster.
 
 A player device gets the playbook and full-screen animated Huddle mode, with no
 Roster tab, no editing and no New Play. In Huddle mode the **Watch** picker
-spotlights one player's route and fades the rest, so a kid can follow their own
-assignment. Local edits on a player device are refused outright rather than
+spotlights one player's route and fades the rest, and aims the pass at them with
+the release timed for that route — so a kid sees the play with the ball coming
+to them. Local edits on a player device are refused outright rather than
 queued, so it stays an exact mirror of the coaches' playbook.
 
 The player code is the SHA-256 of the coach's team code, and the store's row
