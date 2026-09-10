@@ -550,6 +550,11 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .status { display: inline-flex; align-items: center; gap: 6px; font-weight: 750; font-size: 14px; white-space: nowrap; }
 .status.ok { color: #86efac; }
 .status.no { color: var(--muted); }
+/* The invite QR sits on its own white plate so a camera reads it whatever the
+   app's theme, and is capped at a comfortable scanning size on phone or iPad. */
+.qr-box { display: flex; justify-content: center; margin: 6px 0 10px; }
+.qr-box .qr { width: min(280px, 68vw); height: auto; border-radius: 10px; }
+.share-slot { min-height: 72px; }
 .steps { margin: 4px 0 14px; padding-left: 22px; color: var(--muted); font-size: 14px; }
 .steps li { margin: 4px 0; }
 .steps b { color: var(--text); }

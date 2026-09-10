@@ -3,8 +3,101 @@
 
 import { h, btn, iconBtn, openSheet, confirmDialog, toast, timeAgo } from '../ui.js';
 import * as sync from '../sync.js';
+import { qrSvg } from '../qr.js';
 
 const STORE_HELP = 'https://supabase.com/dashboard';
+
+// Where this copy of the app is served from, with no route on the end. A join
+// link is just that address plus the code, so it works from GitHub Pages, a
+// dev server, anywhere the app is hosted.
+const appUrl = () => `${location.origin}${location.pathname}`;
+export const joinLink = (code) => `${appUrl()}#/join/${code}`;
+
+const isInstalled = () => window.navigator.standalone === true
+  || window.matchMedia?.('(display-mode: standalone)').matches === true;
+
+// The invite, as a QR code to point a camera at and a link to send. Scanning
+// beats pasting a 400-character code onto a phone, which is where people give
+// up. The raw code still sits underneath for anyone who prefers it.
+function shareBlock(code, { what }) {
+  const link = joinLink(code);
+  const qr = h('div', { class: 'qr-box' });
+  try {
+    qr.innerHTML = qrSvg(link, { label: `Join as ${what}` });
+  } catch {
+    qr.replaceChildren(h('p', { class: 'p-help' }, 'Too long to show as a QR code — send the link instead.'));
+  }
+  const linkBox = h('textarea', { class: 'input code', rows: 2, readonly: true, spellcheck: 'false' }, link);
+  return h('div', null,
+    qr,
+    h('p', { class: 'p-help center' }, 'Point a phone camera at this, then tap the banner that pops up.'),
+    linkBox,
+    h('div', { class: 'btn-row tight pad' },
+      btn('Copy link', async () => {
+        try { await navigator.clipboard.writeText(link); toast('Link copied'); } catch { linkBox.select(); }
+      }, { iconName: 'copy', kind: 'primary' }),
+      btn('Share', () => navigator.share?.({ title: 'Flag Coach', text: `Join our Flag Coach ${what === 'player' ? 'playbook' : 'team'}`, url: link }).catch(() => {}), { iconName: 'share', kind: 'ghost' })));
+}
+
+// Nothing can install the app for you on an iPhone or iPad, and this is the
+// step people skip — then cannot find the app later.
+function homeScreenSheet() {
+  openSheet({
+    title: 'Keep it on the Home Screen',
+    size: 'md',
+    body: h('div', null,
+      h('p', { class: 'p-help' }, 'Add Flag Coach to the Home Screen so it opens like a real app and keeps working on the field with no signal.'),
+      h('ol', { class: 'steps' },
+        h('li', null, 'Tap ', h('b', null, 'Share'), ' in Safari — the square with an arrow out of the top.'),
+        h('li', null, 'Scroll down and tap ', h('b', null, 'Add to Home Screen'), '.'),
+        h('li', null, 'Tap ', h('b', null, 'Add'), ', then open it once while you still have signal.'))),
+    actions: [{ label: 'Got it', kind: 'primary' }],
+  });
+}
+
+// Shared by the paste-a-code sheet and the tap-a-link route.
+async function confirmAndJoin(pairing) {
+  const player = pairing.role === 'viewer';
+  const ok = await confirmDialog({
+    title: player ? 'Join as a player?' : 'Replace this iPad\u2019s playbook?',
+    message: player
+      ? 'This device will show the team\u2019s plays, read-only — no editing, and no roster. Anything already on this device is replaced.'
+      : 'The team\u2019s plays, roster and seasons take over on this iPad. Anything only on this iPad is lost — save a backup first if you need it.',
+    confirmText: player ? 'Join as player' : 'Replace & join',
+    danger: true,
+  });
+  if (!ok) return { cancelled: true };
+  const res = await sync.joinTeam(pairing);
+  if (res?.error) {
+    await sync.unpair();
+    return { error: res.error };
+  }
+  toast(player ? 'Following the team' : 'Joined the team');
+  if (!isInstalled()) homeScreenSheet();
+  return {};
+}
+
+/**
+ * A tap on a join link lands here: #/join/<code>. Saves the player hunting
+ * through Settings and pasting a code they cannot read.
+ */
+export async function joinFromLink(code, onDone) {
+  let pairing;
+  try {
+    pairing = sync.decodePairing(code);
+  } catch {
+    toast('That join link is not valid', { tone: 'bad' });
+    return;
+  }
+  const cfg = sync.config();
+  if (cfg && cfg.team === pairing.team && cfg.role === pairing.role) {
+    toast('Already on this team');
+    return;
+  }
+  const res = await confirmAndJoin(pairing);
+  if (res.error) toast(String(res.error.message || res.error), { tone: 'bad' });
+  onDone?.();
+}
 
 const stateText = (s) => ({
   off: 'Off — this iPad keeps its plays to itself',
@@ -99,24 +192,13 @@ function joinSheet(onDone) {
             err.textContent = String(e.message || e);
             return false;
           }
-          const player = pairing.role === 'viewer';
-          const ok = await confirmDialog({
-            title: player ? 'Join as a player?' : 'Replace this iPad’s playbook?',
-            message: player
-              ? 'This device will show the team’s plays, read-only — no editing, and no roster. Anything already on this device is replaced.'
-              : 'The team’s plays, roster and seasons take over on this iPad. Anything only on this iPad is lost — save a backup first if you need it.',
-            confirmText: player ? 'Join as player' : 'Replace & join',
-            danger: true,
-          });
-          if (!ok) return false;
-          const res = await sync.joinTeam(pairing);
-          if (res?.error) {
+          const res = await confirmAndJoin(pairing);
+          if (res.cancelled) return false;
+          if (res.error) {
             err.hidden = false;
             err.textContent = String(res.error.message || res.error);
-            await sync.unpair();
             return false;
           }
-          toast(pairing.role === 'viewer' ? 'Following the team' : 'Joined the team');
           onDone?.();
           return true;
         },
@@ -134,7 +216,9 @@ function inviteSheet() {
     title: 'Invite a coach',
     size: 'md',
     body: h('div', null,
-      h('p', { class: 'p-help' }, 'For another coach who needs to build plays. On their iPad: Flag Coach → Settings → Team sync → Join a team, and paste this code. For a player who only needs to study, use “Invite a player” instead.'),
+      h('p', { class: 'p-help' }, 'For another coach who needs to build plays. They scan this or tap the link and the app opens ready to join. For a player who only needs to study, use “Invite a player” instead.'),
+      shareBlock(pairing, { what: 'coach' }),
+      h('div', { class: 'set-title pad' }, 'Or hand over the code'),
       box,
       h('div', { class: 'btn-row tight pad' },
         btn('Copy code', async () => {
@@ -151,7 +235,11 @@ function playerSheet() {
   if (!cfg) return;
   const sql = h('textarea', { class: 'input code', rows: 6, readonly: true, spellcheck: 'false' }, sync.PLAYER_SQL);
   const box = h('textarea', { class: 'input code', rows: 4, readonly: true, spellcheck: 'false' }, 'building the code…');
-  sync.playerPairing().then((code) => { box.value = code; });
+  const share = h('div', { class: 'share-slot' }, h('p', { class: 'p-help center' }, 'Building the invite…'));
+  sync.playerPairing().then((code) => {
+    box.value = code;
+    share.replaceChildren(shareBlock(code, { what: 'player' }));
+  });
 
   openSheet({
     title: 'Invite a player',
@@ -165,14 +253,16 @@ function playerSheet() {
           try { await navigator.clipboard.writeText(sync.PLAYER_SQL); toast('SQL copied'); } catch { sql.select(); }
         }, { iconName: 'copy', kind: 'small ghost' })),
       sql,
-      h('div', { class: 'set-title pad' }, 'The player code'),
+      h('div', { class: 'set-title pad' }, 'The player invite'),
+      share,
+      h('div', { class: 'set-title pad' }, 'Or hand over the code'),
       box,
       h('div', { class: 'btn-row tight pad' },
         btn('Copy player code', async () => {
           try { await navigator.clipboard.writeText(box.value); toast('Player code copied'); } catch { box.select(); }
         }, { iconName: 'copy', kind: 'primary' }),
         btn('Share', () => navigator.share?.({ title: 'Flag Coach player code', text: box.value }).catch(() => {}), { iconName: 'share', kind: 'ghost' })),
-      h('p', { class: 'p-help' }, 'The player pastes it into Settings → Team sync → Join a team, same as a coach. Safe to give the whole team: it cannot change anything, and it cannot be turned back into your coach code.')),
+      h('p', { class: 'p-help' }, 'Safe to give the whole team: it cannot change anything, and it cannot be turned back into your coach code. Hold the QR up at a parent meeting and everyone can join at once — but treat the link like a key and keep it off anywhere public.')),
     actions: [{ label: 'Done', kind: 'primary' }],
   });
 }

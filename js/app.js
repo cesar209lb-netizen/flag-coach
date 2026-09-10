@@ -3,6 +3,7 @@
 import { loadState, playById } from './store.js';
 import * as sync from './sync.js';
 import { openHuddle } from './views/huddle.js';
+import { joinFromLink } from './views/teamsync.js';
 import { h, icon, toast } from './ui.js';
 import * as Home from './views/home.js';
 import * as Playbook from './views/playbook.js';
@@ -31,6 +32,15 @@ function renderTabs(active) {
 
 function route() {
   let [name = 'home', arg] = location.hash.replace(/^#\/?/, '').split('/');
+  // A tap on a join link. Land on Home and let the join confirm open over it,
+  // so a player never has to go hunting through Settings.
+  if (name === 'join') {
+    const code = arg;
+    history.replaceState(null, '', '#/home');
+    name = 'home';
+    arg = undefined;
+    if (code) setTimeout(() => joinFromLink(code, route), 0);
+  }
   // Player view has no editor and no roster; send those back to the playbook.
   if (sync.isViewer() && (name === 'roster' || name === 'play')) {
     const playId = name === 'play' ? arg : null;
