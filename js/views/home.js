@@ -71,7 +71,7 @@ function build() {
       icon('shield'),
       h('div', { class: 'banner-text' },
         h('b', null, s.lastBackupAt ? `Last backup was ${Math.floor((Date.now() - s.lastBackupAt) / 864e5)} days ago` : "You haven't backed up yet"),
-        h('span', null, 'Your plays and roster only live on this iPad. Save a copy to iCloud Drive.')),
+        h('span', null, 'Your plays and roster only live on this device. Save a copy somewhere safe.')),
       btn('Back up now', saveBackup, { kind: 'primary small' })) : null,
 
     h('div', { class: 'home-grid' },
@@ -98,12 +98,12 @@ function build() {
           h('li', null, icon('target'), h('span', null, 'Use "Watch" at the bottom to pick your spot — X, Y, Z or C — and your route lights up while the rest fade back.')),
           h('li', null, icon('play'), h('span', null, 'Tap the field to pause, and try ½× speed to follow a route step by step.')),
           h('li', null, icon('shieldHalf'), h('span', null, 'Switch to "Routes only" to see the play without the defense in the way.')),
-          h('li', null, icon('wifiOff'), h('span', null, 'Add it to your Home Screen and it works with no internet — study on the ride to the game.')),
+          h('li', null, icon('restart'), h('span', null, 'New plays from your coach arrive on their own — no refresh, nothing to re-scan.')),
         ] : [
           h('li', null, icon('route'), h('span', null, 'In a play, tap a player, then tap the field to draw their route — or pick a preset like Slant or Post.')),
           h('li', null, icon('play'), h('span', null, 'Press play to watch it against a defense. Rings show who is open: green open, red covered.')),
           h('li', null, icon('bolt'), h('span', null, 'On the Ball tab, "Find best throw time" tries every timing and picks the one that works.')),
           h('li', null, icon('expand'), h('span', null, 'Huddle Mode shows plays full-screen for the team. Swipe to change plays.')),
-          h('li', null, icon('wifiOff'), h('span', null, 'Works with no internet once added to your Home Screen. Back up often.')),
+          h('li', null, icon('wifiOff'), h('span', null, 'Add it to your home screen and it still works at the field with no signal. Back up often.')),
         ])))));
 }

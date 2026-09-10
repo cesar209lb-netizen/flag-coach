@@ -193,7 +193,7 @@ export function openPlayerEditor(playerId = null) {
       h('div', { class: 'form-row' },
         h('label', { class: 'field-label' }, 'Parent / guardian', text(player, 'parentName', { placeholder: 'Name' })),
         h('label', { class: 'field-label' }, 'Parent phone', text(player, 'parentPhone', { placeholder: 'Phone', type: 'tel' }))),
-      h('label', { class: 'field-label' }, 'Medical notes (allergies, inhaler, etc.)', area(player, 'medical', 'Only visible on this iPad')),
+      h('label', { class: 'field-label' }, 'Medical notes (allergies, inhaler, etc.)', area(player, 'medical', 'Only visible on this device')),
       h('label', { class: 'field-label' }, 'Coach notes', area(player, 'notes', 'Strengths, things to work on…')),
       !isNew ? h('div', { class: 'danger-zone' },
         inSeason ? btn(`Remove from ${season.name}`, async () => {

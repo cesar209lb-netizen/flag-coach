@@ -39,18 +39,56 @@ function shareBlock(code, { what }) {
       btn('Share', () => navigator.share?.({ title: 'Flag Coach', text: `Join our Flag Coach ${what === 'player' ? 'playbook' : 'team'}`, url: link }).catch(() => {}), { iconName: 'share', kind: 'ghost' })));
 }
 
-// Nothing can install the app for you on an iPhone or iPad, and this is the
-// step people skip — then cannot find the app later.
-function homeScreenSheet() {
+// iPadOS reports itself as a Mac, so touch points are what actually separate an
+// iPad from a laptop.
+function platform() {
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/Android/.test(ua)) return 'android';
+  return 'desktop';
+}
+
+// Nothing can install the app for a player, and this is the step they skip and
+// then cannot find the app again. The steps differ by platform: telling someone
+// on a laptop to tap Share in Safari is worse than saying nothing at all.
+const KEEP_IT = {
+  ios: {
+    title: 'Keep it on your Home Screen',
+    intro: 'Add Flag Coach to your Home Screen and it opens like a real app, one tap away.',
+    steps: [
+      ['Tap ', 'Share', ' in Safari — the square with an arrow coming out of the top.'],
+      ['Scroll down and tap ', 'Add to Home Screen', '.'],
+      ['Tap ', 'Add', '. The icon stays on your Home Screen from now on.'],
+    ],
+  },
+  android: {
+    title: 'Keep it on your home screen',
+    intro: 'Add Flag Coach to your home screen and it opens like a real app, one tap away.',
+    steps: [
+      ['Tap the ', '⋮', ' menu at the top right of Chrome.'],
+      ['Tap ', 'Add to Home screen', ' — it may say ', 'Install app', '.'],
+      ['Tap ', 'Add', '. The icon stays on your home screen from now on.'],
+    ],
+  },
+  desktop: {
+    title: 'Keep it handy',
+    intro: 'Bookmark Flag Coach so you can find it again without hunting for the link.',
+    steps: [
+      ['Press ', 'Ctrl+D', ' — or ', 'Cmd+D', ' on a Mac — to bookmark this page.'],
+      ['In Chrome or Edge you can also click the ', 'install', ' icon at the right of the address bar to keep it as its own window.'],
+    ],
+  },
+};
+
+function keepItSheet() {
+  const how = KEEP_IT[platform()];
   openSheet({
-    title: 'Keep it on the Home Screen',
+    title: how.title,
     size: 'md',
     body: h('div', null,
-      h('p', { class: 'p-help' }, 'Add Flag Coach to the Home Screen so it opens like a real app and keeps working on the field with no signal.'),
-      h('ol', { class: 'steps' },
-        h('li', null, 'Tap ', h('b', null, 'Share'), ' in Safari — the square with an arrow out of the top.'),
-        h('li', null, 'Scroll down and tap ', h('b', null, 'Add to Home Screen'), '.'),
-        h('li', null, 'Tap ', h('b', null, 'Add'), ', then open it once while you still have signal.'))),
+      h('p', { class: 'p-help' }, how.intro),
+      h('ol', { class: 'steps' }, ...how.steps.map((parts) =>
+        h('li', null, ...parts.map((part, i) => (i % 2 ? h('b', null, part) : part)))))),
     actions: [{ label: 'Got it', kind: 'primary' }],
   });
 }
@@ -59,10 +97,10 @@ function homeScreenSheet() {
 async function confirmAndJoin(pairing) {
   const player = pairing.role === 'viewer';
   const ok = await confirmDialog({
-    title: player ? 'Join as a player?' : 'Replace this iPad\u2019s playbook?',
+    title: player ? 'Join as a player?' : 'Replace this device\u2019s playbook?',
     message: player
       ? 'This device will show the team\u2019s plays, read-only — no editing, and no roster. Anything already on this device is replaced.'
-      : 'The team\u2019s plays, roster and seasons take over on this iPad. Anything only on this iPad is lost — save a backup first if you need it.',
+      : 'The team\u2019s plays, roster and seasons take over on this device. Anything only on this device is lost — save a backup first if you need it.',
     confirmText: player ? 'Join as player' : 'Replace & join',
     danger: true,
   });
@@ -73,7 +111,7 @@ async function confirmAndJoin(pairing) {
     return { error: res.error };
   }
   toast(player ? 'Following the team' : 'Joined the team');
-  if (!isInstalled()) homeScreenSheet();
+  if (!isInstalled()) keepItSheet();
   return {};
 }
 
@@ -100,7 +138,7 @@ export async function joinFromLink(code, onDone) {
 }
 
 const stateText = (s) => ({
-  off: 'Off — this iPad keeps its plays to itself',
+  off: 'Off — this device keeps its plays to itself',
   idle: s.pending ? `${s.pending} change${s.pending === 1 ? '' : 's'} waiting to go up` : `Synced ${timeAgo(s.lastSyncAt)}`,
   syncing: 'Syncing…',
   offline: s.pending ? `Offline — ${s.pending} change${s.pending === 1 ? '' : 's'} will go up later` : 'Offline — will sync when back online',
@@ -121,7 +159,7 @@ function setupSheet(onDone) {
     title: 'Set up team sync',
     size: 'lg',
     body: h('div', null,
-      h('p', { class: 'p-help' }, 'Sync needs one free store that both iPads talk to. This is a five-minute job you only do once, on this iPad.'),
+      h('p', { class: 'p-help' }, 'Sync needs one free store that every device talks to. This is a five-minute job you only do once, on this device.'),
       h('ol', { class: 'steps' },
         h('li', null, h('b', null, 'Make a free store.'), ' Sign up at ', h('a', { href: STORE_HELP, target: '_blank', rel: 'noopener' }, 'supabase.com'), ' and create a project. Any region, free plan.'),
         h('li', null, h('b', null, 'Run this once.'), ' In that project open SQL Editor, paste the block below and press Run. It makes the table the app syncs through.'),
@@ -133,7 +171,7 @@ function setupSheet(onDone) {
       sql,
       h('label', { class: 'field-label' }, 'Project URL', url),
       h('label', { class: 'field-label' }, 'Anon public key', key),
-      h('p', { class: 'p-help' }, 'These stay on this iPad and travel only in the team code you hand another device. They are never part of the app’s public files.'),
+      h('p', { class: 'p-help' }, 'These stay on this device and travel only in the team code you hand someone else. They are never part of the app’s public files.'),
       err),
     actions: [
       { label: 'Cancel', kind: 'ghost' },
@@ -176,7 +214,7 @@ function joinSheet(onDone) {
     body: h('div', null,
       h('p', { class: 'p-help' }, 'Paste the code you were given. A coach code lets you edit the playbook; a player code is read-only for studying plays.'),
       code,
-      h('p', { class: 'p-help' }, 'Joining replaces this iPad’s plays, roster and seasons with the team’s copy, then keeps both in step from here on.'),
+      h('p', { class: 'p-help' }, 'Joining replaces this device’s plays, roster and seasons with the team’s copy, then keeps both in step from here on.'),
       err),
     actions: [
       { label: 'Cancel', kind: 'ghost' },
@@ -245,7 +283,7 @@ function playerSheet() {
     title: 'Invite a player',
     size: 'lg',
     body: h('div', null,
-      h('p', { class: 'p-help' }, 'A player code is read-only. It shows the playbook and the animation — no editing, and the roster stays on the coaches’ iPads only.'),
+      h('p', { class: 'p-help' }, 'A player code is read-only. It shows the playbook and the animation — no editing, and the roster stays on the coaches’ devices only.'),
       h('div', { class: 'set-title pad' }, 'One-time: switch player view on'),
       h('p', { class: 'p-help' }, 'Run this once in your store’s SQL Editor. Skip it if you set the team up after player view existed — it is already in place, and running it twice is harmless.'),
       h('div', { class: 'btn-row tight pad' },
@@ -278,7 +316,7 @@ export function teamSyncSection(row, rerender) {
     return h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'Team sync'),
       row('Following the team', 'Plays arrive on their own. This device cannot change them.', statusEl),
-      h('p', { class: 'p-help pad' }, 'New plays show up within a few seconds of your coach saving them, and whenever you reopen the app. It all works with no internet — you just see the plays as of the last time you had a signal.'),
+      h('p', { class: 'p-help pad' }, 'New plays show up within a few seconds of your coach saving them, and whenever you reopen the app — nothing to refresh. If you lose signal the plays you already have keep working; you just stop getting new ones until you are back.'),
       h('div', { class: 'set-row' },
         btn('Check for new plays', async () => { await sync.sync(); }, { iconName: 'restart', kind: 'small primary' })),
       h('div', { class: 'set-row' },
@@ -303,15 +341,15 @@ export function teamSyncSection(row, rerender) {
 
   return h('section', { class: 'set-section' },
     h('div', { class: 'set-title' }, 'Team sync'),
-    row('Status', sync.isOn() ? 'Plays, roster and rules stay in step across paired iPads' : 'Off — plays live only on this iPad', statusEl),
+    row('Status', sync.isOn() ? 'Plays, roster and rules stay in step across paired devices' : 'Off — plays live only on this device', statusEl),
     sync.isOn() ? h('p', { class: 'p-help pad' }, 'Edits sync a few seconds after you make them, and whenever the app comes back online. If two people change the same play, the most recent edit wins. A player code is read-only and never includes the roster.')
-      : h('p', { class: 'p-help pad' }, 'Pair another iPad so plays made at home show up at practice, and hand players a read-only code to study from. Needs a free store you set up once — backups keep working either way.'),
+      : h('p', { class: 'p-help pad' }, 'Pair another device so plays made at home show up at practice, and hand players a read-only code to study from. Needs a free store you set up once — backups keep working either way.'),
     h('div', { class: 'set-row' }, controls),
     sync.isOn() ? h('div', { class: 'set-row' },
-      btn('Stop syncing on this iPad', async () => {
+      btn('Stop syncing on this device', async () => {
         if (await confirmDialog({
           title: 'Stop syncing?',
-          message: 'This iPad keeps everything it has now but stops sending and receiving changes. You can pair it again later with the team code.',
+          message: 'This device keeps everything it has now but stops sending and receiving changes. You can pair it again later with the team code.',
           confirmText: 'Stop syncing',
           danger: true,
         })) { await sync.unpair(); rerender(); }

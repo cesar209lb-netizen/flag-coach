@@ -1,6 +1,12 @@
 # Flag Coach
 
-A 5v5 flag football coaching app for iPad: playbook with a route designer and play animation, roster with photos, huddle mode, and backups. Plain HTML/CSS/JavaScript — no build step, no accounts. Data lives on the iPad (IndexedDB) and the app works offline once installed. Optional team sync shares one playbook across two iPads through a free store you own.
+A 5v5 flag football coaching app, built for a coach's iPad but usable from any
+phone, tablet or computer: playbook with a route designer and play animation,
+roster with photos, huddle mode, and backups. Plain HTML/CSS/JavaScript — no
+build step, no accounts. Data lives on the device (IndexedDB), and the app keeps
+working with no signal once installed — which matters on a field on game day.
+Optional team sync shares one playbook across every paired device, and hands
+players a read-only copy, through a free store you own.
 
 ## Run it on the Mac
 
@@ -31,24 +37,24 @@ across the field runs them the other way. Nothing here touches the playbook.
 
 ## Sharing a playbook with another coach (team sync)
 
-Two iPads can share one playbook. It is off by default — nothing leaves a
+Paired devices can share one playbook. It is off by default — nothing leaves a
 device until you turn it on.
 
-**On the iPad that has the playbook**
+**On the device that has the playbook**
 
-1. Make the free store both iPads talk to: sign up at
+1. Make the free store every device talks to: sign up at
    [supabase.com](https://supabase.com/dashboard), create a project (any region,
    free plan).
 2. In that project: **SQL Editor** → paste the block shown in the app
    (Settings → Team sync → Set up team sync → *Copy the SQL*) → **Run**.
 3. In the project: **Settings → API** → copy the **Project URL** and the
-   **anon public** key into the app, then tap **Start syncing**. This iPad's
+   **publishable** key into the app, then tap **Start syncing**. This device's
    plays, roster, photos and rules go up.
 4. Tap **Invite a device** and AirDrop or text the team code to the other coach.
 
-**On the other iPad**
+**On the other device**
 
-Settings → Team sync → **Join a team** → paste the code. That iPad takes the
+Settings → Team sync → **Join a team** → paste the code. That device takes the
 team's copy (its own plays are replaced — save a backup first if it has any),
 and from then on both stay in step.
 
@@ -80,23 +86,24 @@ turned back into a coach code or used to write anything.
 
 **How it behaves**
 
-- Edits go up a few seconds after you make them, and each iPad pulls every 30
-  seconds, when it comes back online, and when you reopen the app.
-- Offline still works. Changes queue on the iPad and go up next time it has
+- Edits go up a few seconds after you make them, and each device pulls every 10
+  seconds while the app is on screen — every 60 in the background — as well as
+  when it comes back online and when you reopen the app.
+- Offline still works. Changes queue on the device and go up next time it has
   internet.
 - If two people change the same play, the most recent edit wins. Deletes travel
-  too, so removing a play on one iPad removes it on the other.
+  too, so removing a play on one device removes it on the others.
 - The **coach** code is the key to the team: anyone holding it can read and
   change the plays and roster, which include player names and photos. (The
   player code is read-only and roster-free — see above.) Send it directly
   to the person, don't post it anywhere public, and note that the URL and key
-  live only on the paired iPads — they are never part of the app's public files.
-- **Stop syncing** unpairs one iPad and leaves everything it has in place.
+  live only on the paired devices — they are never part of the app's public files.
+- **Stop syncing** unpairs one device and leaves everything it has in place.
   Backups keep working exactly as before, synced or not.
 
 ## Updating the app
 
-Whenever files change, bump `CACHE` in `sw.js` (e.g. `flagcoach-v2`) before uploading. Next time the iPad opens the app online, it shows **"A new version is ready → Update"**. Plays, roster and photos are not affected by updates.
+Whenever files change, bump `CACHE` in `sw.js` (e.g. `flagcoach-v2`) before uploading. Next time the device opens the app online, it shows **"A new version is ready → Update"**. Plays, roster and photos are not affected by updates.
 
 ## Designing against a defense
 
@@ -115,7 +122,7 @@ once, which is the fastest way to find the one that breaks it.
 
 ## Backups
 
-Settings → **Save backup** creates one `.json` file (plays, roster, photos, seasons). Save it to iCloud Drive. **Restore from backup** replaces everything on the iPad with the file's contents.
+Settings → **Save backup** creates one `.json` file (plays, roster, photos, seasons). Save it to iCloud Drive. **Restore from backup** replaces everything on the device with the file's contents.
 
 ## Code map
 

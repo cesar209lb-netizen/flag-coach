@@ -12,7 +12,12 @@ const TABLE = 'records';
 const PAGE = 200;
 // Photos ride along inside player records, so cap a push by payload size too.
 const MAX_BATCH_BYTES = 1_200_000;
-const AUTO_MS = 30_000;
+// How often to look for someone else's changes. A player watching the playbook
+// wants a new play to land while they are looking at it, so poll briskly with
+// the app on screen and back off when it is not — which also asks less of a
+// phone in a pocket than the old flat 30 seconds did.
+const AUTO_ACTIVE_MS = 10_000;
+const AUTO_IDLE_MS = 60_000;
 const DEBOUNCE_MS = 2500;
 // Re-ask for a small window before the cursor: cheap, and no row can slip
 // through if two devices write in the same instant.
@@ -306,10 +311,16 @@ const clearStore = async (name) => db.delAll(name, (await db.getAll(name)).map((
 
 let wired = false;
 
+// Restart the timer at whatever pace suits the app's current visibility.
+function schedule() {
+  clearInterval(auto);
+  if (!isOn()) return;
+  auto = setInterval(() => sync({ quiet: true }), document.hidden ? AUTO_IDLE_MS : AUTO_ACTIVE_MS);
+}
+
 export function start() {
   if (!isOn()) return;
-  clearInterval(auto);
-  auto = setInterval(() => sync({ quiet: true }), AUTO_MS);
+  schedule();
   if (wired) return;
   wired = true;
   // A local edit syncs shortly after the user stops typing or dragging.
@@ -319,7 +330,10 @@ export function start() {
     timer = setTimeout(() => sync({ quiet: true }), DEBOUNCE_MS);
   });
   addEventListener('online', () => sync({ quiet: true }));
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) sync({ quiet: true }); });
+  document.addEventListener('visibilitychange', () => {
+    schedule();
+    if (!document.hidden) sync({ quiet: true });
+  });
 }
 
 // The SQL a new team store needs, shown in Settings so it can be copied once.

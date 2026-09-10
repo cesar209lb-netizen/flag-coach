@@ -73,9 +73,9 @@ function build(rerender = () => {}) {
 
     viewer ? null : h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'Backup & restore'),
-      row('Last backup', s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString() : 'Your plays and roster only live on this iPad',
+      row('Last backup', s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString() : 'Your plays and roster only live on this device',
         h('span', { class: `status ${backupAge < 7 * 864e5 ? 'ok' : 'no'}` }, timeAgo(s.lastBackupAt))),
-      h('p', { class: 'p-help pad' }, 'Save a backup file to iCloud Drive (or AirDrop it to your Mac) every week or two. If the iPad is lost or reset, restoring the file brings back everything — plays, roster, photos and seasons.'),
+      h('p', { class: 'p-help pad' }, 'Save a backup file to iCloud Drive (or AirDrop it to your Mac) every week or two. If this device is lost or reset, restoring the file brings back everything — plays, roster, photos and seasons.'),
       h('div', { class: 'set-row' },
         h('div', { class: 'btn-row tight' },
           btn('Save backup', saveBackup, { iconName: 'share', kind: 'primary' }),
@@ -85,9 +85,9 @@ function build(rerender = () => {}) {
       h('div', { class: 'set-title' }, 'Use at the field (offline)'),
       row('Installed on Home Screen', standalone ? 'Running as an app' : 'Open in Safari → Share → Add to Home Screen',
         h('span', { class: `status ${standalone ? 'ok' : 'no'}` }, standalone ? 'Yes' : 'Not yet')),
-      row('Works without internet', offlineReady ? 'All app files are saved on this iPad' : 'Needs to be opened once from the hosted website',
+      row('Works without internet', offlineReady ? 'All app files are saved on this device' : 'Needs to be opened once from the hosted website',
         h('span', { class: `status ${offlineReady ? 'ok' : 'no'}` }, offlineReady ? 'Ready' : 'Not yet')),
-      row('Storage protected', 'Keeps iPadOS from clearing app data', persistEl),
+      row('Storage protected', 'Keeps the browser from clearing app data', persistEl),
       h('ol', { class: 'steps' },
         h('li', null, 'At home on Wi-Fi, open the Flag Coach website in ', h('b', null, 'Safari'), '.'),
         h('li', null, 'Tap ', h('b', null, 'Share'), ' → ', h('b', null, 'Add to Home Screen'), '.'),
@@ -96,10 +96,10 @@ function build(rerender = () => {}) {
 
     h('section', { class: 'set-section' },
       h('div', { class: 'set-title' }, 'About'),
-      row('Flag Coach', `Version ${APP_VERSION} · everything stays on this iPad`, icon('shield')),
+      row('Flag Coach', `Version ${APP_VERSION} · everything stays on this device`, icon('shield')),
       h('div', { class: 'set-row' }, btn('Erase all data', async () => {
-        if (!(await confirmDialog({ title: 'Erase everything?', message: 'All plays, players, photos and seasons on this iPad will be deleted. Save a backup first if you might want them back.', confirmText: 'Continue', danger: true }))) return;
-        if (!(await confirmDialog({ title: 'Are you sure?', message: isOn() ? 'This cannot be undone. Team sync also stops on this iPad, so the team’s copy is left alone.' : 'This cannot be undone.', confirmText: 'Erase everything', danger: true }))) return;
+        if (!(await confirmDialog({ title: 'Erase everything?', message: 'All plays, players, photos and seasons on this device will be deleted. Save a backup first if you might want them back.', confirmText: 'Continue', danger: true }))) return;
+        if (!(await confirmDialog({ title: 'Are you sure?', message: isOn() ? 'This cannot be undone. Team sync also stops on this device, so the team’s copy is left alone.' : 'This cannot be undone.', confirmText: 'Erase everything', danger: true }))) return;
         if (isOn()) await unpair();
         await eraseEverything();
         toast('All data erased');
