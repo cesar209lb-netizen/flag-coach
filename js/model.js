@@ -1,0 +1,323 @@
+// Data shapes, formations, route presets and starter plays.
+// Field coordinates are in yards: x = 0 (left sideline) → W (right sideline),
+// y = yards from the line of scrimmage (negative = backfield, positive = downfield).
+
+export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const r2 = (n) => Math.round(n * 100) / 100;
+
+export const SLOTS = ['QB', 'C', 'X', 'Y', 'Z'];
+export const SLOT_COLORS = { QB: '#f1f5f9', C: '#a855f7', X: '#ef4444', Y: '#facc15', Z: '#3b82f6' };
+export const SLOT_TEXT = { QB: '#0f172a', C: '#ffffff', X: '#ffffff', Y: '#1c1917', Z: '#ffffff' };
+export const ROUTE_COLORS = { ...SLOT_COLORS, QB: '#e2e8f0' };
+
+export const POSITIONS = ['QB', 'C', 'WR', 'RB', 'Rusher', 'CB', 'Safety', 'LB'];
+export const RATINGS = [
+  { key: 'speed', label: 'Speed' },
+  { key: 'hands', label: 'Hands' },
+  { key: 'routes', label: 'Route Running' },
+  { key: 'flags', label: 'Flag Pulling' },
+  { key: 'throwing', label: 'Throwing' },
+  { key: 'iq', label: 'Football IQ' },
+];
+export const JERSEY_SIZES = ['YS', 'YM', 'YL', 'YXL', 'AS', 'AM', 'AL', 'AXL'];
+export const DEFAULT_TAGS = ['Quick Pass', 'Deep Shot', 'Run', 'Red Zone', 'Short Yardage', 'Trick Play', 'Extra Point'];
+
+export const COVERAGES = [
+  { id: 'none', name: 'None', desc: 'Just your routes' },
+  { id: 'man', name: 'Man', desc: 'Each defender follows a receiver' },
+  { id: 'zone22', name: 'Zone 2-2', desc: '2 short, 2 deep areas' },
+  { id: 'zone31', name: 'Zone 3-1', desc: '3 short, 1 deep safety' },
+];
+
+// A "look" is alignment only — where the defense stands before the snap. It
+// composes with any coverage: cushion and shade move the man defenders, depth
+// shifts the zone anchors, and rushSpot slides the rusher along the rush line.
+export const LOOKS = [
+  { id: 'base', name: 'Base', desc: 'Standard depth, rusher over the ball', cushion: 5.5, shade: 'auto', depth: 0, rushSpot: 'mid' },
+  { id: 'press', name: 'Press', desc: 'Up on the line, in their face', cushion: 1.4, shade: 'outside', depth: -1, rushSpot: 'mid' },
+  { id: 'off', name: 'Off', desc: 'Big cushion — nothing deep', cushion: 8, shade: 'inside', depth: 1.5, rushSpot: 'mid' },
+  { id: 'inside', name: 'Inside Shade', desc: 'Takes away the middle', cushion: 4, shade: 'inside', depth: 0, rushSpot: 'mid' },
+  { id: 'outside', name: 'Outside Shade', desc: 'Funnels everything inside', cushion: 4, shade: 'outside', depth: 0, rushSpot: 'mid' },
+  { id: 'wideR', name: 'Wide Rush R', desc: 'Rusher off the right edge', cushion: 5.5, shade: 'auto', depth: 0, rushSpot: 'right' },
+  { id: 'wideL', name: 'Wide Rush L', desc: 'Rusher off the left edge', cushion: 5.5, shade: 'auto', depth: 0, rushSpot: 'left' },
+  { id: 'bail', name: 'Bail', desc: 'Everyone drops — protect the deep ball', cushion: 7.5, shade: 'inside', depth: 3, rushSpot: 'mid' },
+  { id: 'crash', name: 'Crash', desc: 'All shallow, nobody deep', cushion: 2.5, shade: 'auto', depth: -2.5, rushSpot: 'mid' },
+];
+
+export const lookById = (id) => LOOKS.find((l) => l.id === id) || LOOKS[0];
+export const coverageById = (id) => COVERAGES.find((c) => c.id === id) || COVERAGES[0];
+
+// Plays saved before looks existed have no `look`; they read as Base.
+export const defenseOf = (play) => ({ look: 'base', coverage: 'man', rush: true, ...(play?.defense || {}) });
+
+export function defenseLabel(def) {
+  const cov = coverageById(def.coverage);
+  if (def.coverage === 'none') return def.rush === false ? 'No defense' : 'Rush only';
+  return `${cov.name} · ${lookById(def.look).name}`;
+}
+
+// The only alignment that has a left/right side, so the only one a flip changes.
+export const mirrorLook = (id) => (id === 'wideR' ? 'wideL' : id === 'wideL' ? 'wideR' : id);
+
+export const sameDefense = (a, b) =>
+  a.coverage === b.coverage && a.look === b.look && (a.rush !== false) === (b.rush !== false);
+
+export function defaultSettings() {
+  return {
+    id: 'settings', teamName: 'My Team',
+    fieldWidth: 30, passClock: 7, rushDistance: 8,
+    activeSeasonId: null, lastBackupAt: null, lastChangeAt: null,
+    tags: [...DEFAULT_TAGS], seeded: false, createdAt: Date.now(),
+  };
+}
+
+export function seasonNameFor(date = new Date()) {
+  const m = date.getMonth();
+  return `${m >= 7 ? 'Fall' : m >= 4 ? 'Summer' : m >= 1 ? 'Spring' : 'Winter'} ${date.getFullYear()}`;
+}
+
+export const newSeason = (name) => ({ id: uid(), name, createdAt: Date.now(), roster: [] });
+
+export const newPlayer = () => ({
+  id: uid(), first: '', last: '', nickname: '', photo: null,
+  parentName: '', parentPhone: '', medical: '', notes: '',
+  createdAt: Date.now(), updatedAt: Date.now(),
+});
+
+export const newRosterEntry = (playerId) => ({
+  playerId, number: '', positions: [], jerseySize: '',
+  ratings: { speed: 3, hands: 3, routes: 3, flags: 3, throwing: 3, iq: 3 },
+});
+
+export function overall(ratings) {
+  const vals = Object.values(ratings || {});
+  if (!vals.length) return 0;
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return Math.round(40 + ((avg - 1) / 4) * 59);
+}
+
+// ---------- Geometry helpers on a play player ----------
+
+export function snapPos(p) {
+  if (p.motion?.length) { const [dx, dy] = p.motion[p.motion.length - 1]; return { x: p.x + dx, y: p.y + dy }; }
+  return { x: p.x, y: p.y };
+}
+export const absMotion = (p) => [{ x: p.x, y: p.y }, ...p.motion.map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy }))];
+export function absRoute(p) {
+  const s = snapPos(p);
+  return [s, ...p.route.map(([dx, dy]) => ({ x: s.x + dx, y: s.y + dy }))];
+}
+
+// ---------- Formations ----------
+// Offsets are from the center of a 30-yard-wide field; x scales with field width.
+
+const BASE = { QB: [0, -5], C: [0, -0.6] };
+export const FORMATIONS = [
+  { id: 'spread', name: 'Spread', desc: '2 left · 1 right', pos: { X: [-12, -1], Y: [-7, -1], Z: [12, -1] } },
+  { id: 'trips', name: 'Trips Right', desc: '3 receivers right', pos: { X: [4.5, -1], Y: [8, -1.5], Z: [12, -1] } },
+  { id: 'twins', name: 'Twins Right', desc: '1 left · 2 right', pos: { X: [-12, -1], Y: [7, -1], Z: [12, -1] } },
+  { id: 'bunch', name: 'Bunch Right', desc: 'Tight triangle', pos: { X: [7, -1], Y: [8.8, -2.6], Z: [5.2, -2.6] } },
+  { id: 'stack', name: 'Stack Left', desc: 'Stacked receivers', pos: { X: [-10, -1], Y: [-10, -3.5], Z: [12, -1] } },
+  { id: 'pistol', name: 'Pistol', desc: 'RB behind QB', pos: { X: [-12, -1], Y: [0, -8, 'RB'], Z: [12, -1] } },
+  { id: 'split', name: 'Split Back', desc: 'RB beside QB', pos: { X: [-12, -1], Y: [-3, -5, 'RB'], Z: [12, -1] } },
+];
+
+export function formationPos(f, slot, W) {
+  const [dx, dy, label] = f.pos[slot] || BASE[slot];
+  return { x: r2(W / 2 + (dx * W) / 30), y: dy, label: label || slot };
+}
+
+export function newPlay({ name = 'New Play', formationId = 'spread', W = 30 } = {}) {
+  const f = FORMATIONS.find((x) => x.id === formationId) || FORMATIONS[0];
+  return {
+    id: uid(), name, formation: f.name, tags: [], rating: 0, notes: '',
+    players: SLOTS.map((slot) => {
+      const { x, y, label } = formationPos(f, slot, W);
+      return { slot, label, x, y, route: [], routeId: null, motion: [], read: null, assigned: null };
+    }),
+    ball: [{ id: uid(), type: 'pass', to: null, time: 2.0, auto: false }],
+    defense: { look: 'base', coverage: 'man', rush: true },
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
+}
+
+export function applyFormation(play, formationId, W) {
+  const f = FORMATIONS.find((x) => x.id === formationId);
+  if (!f) return;
+  for (const p of play.players) {
+    const { x, y, label } = formationPos(f, p.slot, W);
+    p.x = x; p.y = y;
+    if (p.slot !== 'QB' && p.slot !== 'C') p.label = label;
+  }
+  play.formation = f.name;
+}
+
+// ---------- Routes ----------
+// Route points are [out, depth]: "out" is toward the receiver's nearest sideline.
+
+export const ROUTES = [
+  { id: 'go', name: 'Go', pts: [[0, 20]] },
+  { id: 'slant', name: 'Slant', pts: [[0, 2], [-7, 8]] },
+  { id: 'quickout', name: 'Quick Out', pts: [[0, 4], [6, 4]] },
+  { id: 'out', name: 'Out', pts: [[0, 7], [8, 7]] },
+  { id: 'in', name: 'In', pts: [[0, 7], [-9, 7]] },
+  { id: 'post', name: 'Post', pts: [[0, 8], [-7, 17]] },
+  { id: 'corner', name: 'Corner', pts: [[0, 8], [6, 15]] },
+  { id: 'curl', name: 'Curl', pts: [[0, 8], [-1, 6.5]] },
+  { id: 'hitch', name: 'Hitch', pts: [[0, 5], [0, 4]] },
+  { id: 'comeback', name: 'Comeback', pts: [[0, 10], [2.5, 8]] },
+  { id: 'drag', name: 'Drag', pts: [[0, 2], [-15, 3]] },
+  { id: 'flat', name: 'Flat', pts: [[3, 1], [8, 2]] },
+  { id: 'wheel', name: 'Wheel', pts: [[4, 1], [6, 4], [6, 18]] },
+  { id: 'sluggo', name: 'Slant & Go', pts: [[0, 3], [-2, 5], [-2, 19]] },
+  { id: 'outup', name: 'Out & Up', pts: [[0, 5], [3, 5], [3.5, 19]] },
+  { id: 'cross', name: 'Deep Cross', pts: [[0, 6], [-14, 11]] },
+  { id: 'arrow', name: 'Arrow', pts: [[5, 4]] },
+  { id: 'swing', name: 'Swing', pts: [[3, -1], [6, -0.5], [8, 2]] },
+];
+
+export const QB_ROUTES = [
+  { id: 'qbstay', name: 'Stay', pts: [], abs: true },
+  { id: 'drop', name: 'Drop Back', pts: [[0, -2]], abs: true },
+  { id: 'rollR', name: 'Roll Right', pts: [[4, -1.5], [8, -1]], abs: true },
+  { id: 'rollL', name: 'Roll Left', pts: [[-4, -1.5], [-8, -1]], abs: true },
+  { id: 'stepup', name: 'Step Up', pts: [[0, 1.5]], abs: true },
+];
+
+export const routeById = (id) => ROUTES.find((r) => r.id === id) || QB_ROUTES.find((r) => r.id === id);
+
+export function routeLabel(p) {
+  if (!p.route.length) return p.slot === 'QB' ? 'Stay' : 'No route';
+  return routeById(p.routeId)?.name || 'Custom';
+}
+
+export function applyRoute(p, route, W) {
+  const dir = route.abs ? 1 : p.x < W / 2 - 0.25 ? -1 : 1;
+  const s = snapPos(p);
+  p.route = route.pts.map(([o, d]) => {
+    const x = Math.max(0.5, Math.min(W - 0.5, s.x + o * dir));
+    return [r2(x - s.x), d];
+  });
+  p.routeId = route.id;
+}
+
+const swapLR = (s) => s.replace(/\b(Right|Left)\b/g, (m) => (m === 'Right' ? 'Left' : 'Right'));
+
+export function flipPlay(play, W) {
+  for (const p of play.players) {
+    p.x = r2(W - p.x);
+    p.route = p.route.map(([dx, dy]) => [-dx, dy]);
+    p.motion = p.motion.map(([dx, dy]) => [-dx, dy]);
+    if (p.routeId === 'rollR') p.routeId = 'rollL'; else if (p.routeId === 'rollL') p.routeId = 'rollR';
+  }
+  if (play.defense?.look) play.defense = { ...play.defense, look: mirrorLook(play.defense.look) };
+  play.formation = swapLR(play.formation || '');
+  play.name = swapLR(play.name);
+}
+
+export function copyPlay(play, nameSuffix = ' (copy)') {
+  const c = structuredClone(play);
+  c.id = uid();
+  c.name = play.name + nameSuffix;
+  c.ball.forEach((b) => { b.id = uid(); });
+  c.createdAt = c.updatedAt = Date.now();
+  delete c.starter;
+  return c;
+}
+
+// The receiver the QB is looking for on the (first) pass.
+export function passTarget(play) {
+  const pass = play.ball.find((b) => b.type === 'pass');
+  if (!pass) return null;
+  if (pass.to) return pass.to;
+  return autoPassTarget(play);
+}
+export function autoPassTarget(play) {
+  const byRead = play.players.filter((p) => p.read && p.slot !== 'QB').sort((a, b) => a.read - b.read)[0];
+  if (byRead) return byRead.slot;
+  return play.players.find((p) => p.slot !== 'QB' && p.route.length)?.slot || null;
+}
+
+// ---------- Starter playbook ----------
+
+export function starterPlays(W) {
+  const make = (name, formationId, spec) => {
+    const play = newPlay({ name, formationId, W });
+    for (const [slot, s] of Object.entries(spec.players)) {
+      const p = play.players.find((x) => x.slot === slot);
+      if (s.motion) p.motion = s.motion;
+      if (s.route) applyRoute(p, routeById(s.route), W);
+      if (s.pts) { p.route = s.pts; p.routeId = 'custom'; }
+      if (s.read) p.read = s.read;
+    }
+    play.ball = spec.ball.map((b) => ({ id: uid(), auto: false, ...b }));
+    play.defense = spec.defense;
+    play.tags = spec.tags;
+    play.notes = spec.notes;
+    play.rating = spec.rating || 0;
+    play.starter = true;
+    return play;
+  };
+
+  return [
+    make('Quick Slants', 'spread', {
+      players: { X: { route: 'go', read: 3 }, Y: { route: 'slant', read: 1 }, Z: { route: 'slant', read: 2 }, C: { route: 'hitch', read: 4 } },
+      ball: [{ type: 'pass', to: 'Y', time: 1.2 }],
+      defense: { look: 'press', coverage: 'man', rush: true }, tags: ['Quick Pass'], rating: 4,
+      notes: 'Ball out fast! Hit Y right after the cut. X runs the defender deep to open the middle.',
+    }),
+    make('Flood Right', 'trips', {
+      players: { X: { route: 'flat', read: 2 }, Y: { route: 'out', read: 1 }, Z: { route: 'go', read: 3 }, C: { route: 'hitch' } },
+      ball: [{ type: 'pass', to: 'Y', time: 1.7 }],
+      defense: { look: 'base', coverage: 'zone22', rush: true }, tags: ['Quick Pass'], rating: 3,
+      notes: 'High-low on the right side. Z clears deep, Y sits in the space, X is the safe check-down.',
+    }),
+    make('Mesh', 'spread', {
+      players: {
+        X: { pts: [[0, 2], [15, 2.5]], read: 1 },
+        Z: { pts: [[0, 4], [-15, 4.5]], read: 2 },
+        Y: { route: 'corner', read: 3 },
+        C: { route: 'hitch' },
+      },
+      ball: [{ type: 'pass', to: 'X', time: 1.6 }],
+      defense: { look: 'inside', coverage: 'man', rush: true }, tags: ['Quick Pass', 'Short Yardage'], rating: 4,
+      notes: 'X and Z cross underneath — X goes under, Z goes over. Great against man.',
+    }),
+    make('Snag', 'bunch', {
+      players: {
+        Z: { pts: [[1, 5], [1.5, 4.5]], read: 1 },
+        Y: { route: 'flat', read: 2 },
+        X: { route: 'corner', read: 3 },
+        C: { route: 'drag' },
+      },
+      ball: [{ type: 'pass', to: 'Z', time: 1.3 }],
+      defense: { look: 'crash', coverage: 'zone31', rush: true }, tags: ['Quick Pass', 'Red Zone'], rating: 3,
+      notes: 'Triangle read. Z sits down in the hole, Y to the flat, X corner if the safety bites.',
+    }),
+    make('Jet Sweep', 'spread', {
+      players: {
+        Z: { motion: [[-6, -2]], pts: [[-6, -1], [-13, -0.5], [-15, 5], [-15, 14]] },
+        X: { route: 'go' }, Y: { route: 'go' }, C: { route: 'hitch' },
+      },
+      ball: [{ type: 'handoff', to: 'Z', time: 1, auto: true }],
+      defense: { look: 'crash', coverage: 'man', rush: true }, tags: ['Run'], rating: 3,
+      notes: 'Z in motion — snap when Z is behind the center. Hand off on the run. X and Y take their defenders deep.',
+    }),
+    make('Flea Flicker', 'pistol', {
+      players: {
+        Y: { pts: [[1.2, 2.5], [3, 5], [4, 5.5]] },
+        QB: { pts: [[0, -2.5]] },
+        Z: { route: 'go', read: 1 },
+        X: { route: 'post', read: 2 },
+        C: { route: 'hitch' },
+      },
+      ball: [
+        { type: 'handoff', to: 'Y', time: 0.6, auto: true },
+        { type: 'pitch', to: 'QB', time: 1.1 },
+        { type: 'pass', to: 'Z', time: 2.2 },
+      ],
+      defense: { look: 'off', coverage: 'man', rush: true }, tags: ['Trick Play', 'Deep Shot'], rating: 5,
+      notes: 'Sell the run! RB takes the handoff, pitches back to QB, and Z should be behind everybody.',
+    }),
+  ];
+}
