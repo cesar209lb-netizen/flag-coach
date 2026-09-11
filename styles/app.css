@@ -738,3 +738,24 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .gd-pick .ic { width: 18px; height: 18px; color: var(--muted); }
 .gd-game-row { text-align: left; }
 .play-real { color: #86efac; font-size: 12px; font-weight: 700; margin-top: 2px; }
+
+/* ---------- Defensive playbook ---------- */
+.book-toggle { margin: 0 0 14px; }
+.btn-row.stack { flex-direction: column; align-items: stretch; }
+.def-edit { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.def-fieldwrap { position: relative; aspect-ratio: 31 / 33; background: #1a5424; border-radius: 12px; overflow: hidden; }
+.def-fieldwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.def-panel { min-width: 0; }
+.def-list { display: flex; flex-direction: column; gap: 6px; }
+.def-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 11px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); }
+.def-row .ic { width: 18px; height: 18px; color: var(--muted); }
+.def-dot { display: grid; place-items: center; min-width: 30px; height: 26px; padding: 0 6px;
+  border-radius: 8px; font-family: var(--round); font-weight: 800; font-size: 13px;
+  background: #111827; color: #fca5a5; border: 1px solid #f87171; }
+.def-dot.rush { background: #b91c1c; color: #fff; border-color: #fecaca; }
+.def-dot.zone { background: rgba(248, 113, 113, .16); color: #fca5a5; }
+@media (orientation: portrait), (max-width: 900px) {
+  .def-edit { grid-template-columns: 1fr; }
+  .def-fieldwrap { aspect-ratio: 31 / 28; }
+}

@@ -6,10 +6,15 @@ import { FORMATIONS, newPlay, copyPlay, flipPlay, playStats } from '../model.js'
 import { playThumb } from '../field.js';
 import { openHuddle } from './huddle.js';
 import { isViewer } from '../sync.js';
+import { defenseGrid } from './defense.js';
 
 let query = '';
 let tagFilter = 'All';
 let sort = 'recent';
+
+// Offence and defence are both the playbook; a toggle switches which one you
+// are looking at rather than spending another tab on it.
+let book = 'offense';
 
 export function mount(root) {
   const gridEl = h('div', { class: 'play-grid' });
@@ -19,16 +24,41 @@ export function mount(root) {
   search.addEventListener('input', () => { query = search.value; renderGrid(); });
   const sortWrap = h('div');
 
+  const actionsEl = h('div', { class: 'head-actions' });
+  const bookWrap = isViewer() ? null : h('div', { class: 'book-toggle' });
+  const offenseEl = h('div', null,
+    h('div', { class: 'toolbar' }, h('div', { class: 'search-wrap' }, icon('search'), search), sortWrap),
+    chipsEl, gridEl);
+  const defense = isViewer() ? null : defenseGrid();
+  const bodyEl = h('div', null, offenseEl);
+
   root.append(h('div', { class: 'page' },
     h('header', { class: 'page-head' },
       h('div', null, h('h1', null, 'Playbook'), countEl),
-      h('div', { class: 'head-actions' },
-        btn(isViewer() ? 'Watch all' : 'Huddle', () => { const l = filtered(); if (l.length) openHuddle(l.map((p) => p.id), 0); },
-          { iconName: 'expand', kind: isViewer() ? 'primary' : 'ghost' }),
-        isViewer() ? null : btn('Call sheet', () => { location.hash = '#/callsheet'; }, { iconName: 'download', kind: 'ghost' }),
-        isViewer() ? null : btn('New Play', openNewPlaySheet, { iconName: 'plus', kind: 'primary' }))),
-    h('div', { class: 'toolbar' }, h('div', { class: 'search-wrap' }, icon('search'), search), sortWrap),
-    chipsEl, gridEl));
+      actionsEl),
+    bookWrap, bodyEl));
+
+  function renderBook() {
+    if (!bookWrap) return;
+    bookWrap.replaceChildren(segmented(
+      [{ value: 'offense', label: 'Offense' }, { value: 'defense', label: 'Defense' }], book,
+      (v) => { book = v; render(); }, { cls: 'small' }));
+    bodyEl.replaceChildren(book === 'defense' ? defense.el : offenseEl);
+  }
+
+  function renderActions() {
+    if (book === 'defense') {
+      actionsEl.replaceChildren(btn('New defense', () => defense.newCall(), { iconName: 'plus', kind: 'primary' }));
+      countEl.textContent = `${state.defplays.length} defensive call${state.defplays.length === 1 ? '' : 's'}`;
+      return;
+    }
+    actionsEl.replaceChildren(...[
+      btn(isViewer() ? 'Watch all' : 'Huddle', () => { const l = filtered(); if (l.length) openHuddle(l.map((p) => p.id), 0); },
+        { iconName: 'expand', kind: isViewer() ? 'primary' : 'ghost' }),
+      isViewer() ? null : btn('Call sheet', () => { location.hash = '#/callsheet'; }, { iconName: 'download', kind: 'ghost' }),
+      isViewer() ? null : btn('New Play', openNewPlaySheet, { iconName: 'plus', kind: 'primary' }),
+    ].filter(Boolean));
+  }
 
   function renderSort() {
     sortWrap.replaceChildren(segmented([
@@ -98,10 +128,14 @@ export function mount(root) {
     }));
   }
 
-  function render() { renderSort(); renderChips(); renderGrid(); }
+  function render() {
+    renderBook();
+    renderActions();
+    if (book === 'offense') { renderSort(); renderChips(); renderGrid(); }
+  }
   render();
   const unsub = subscribe(render);
-  return { destroy: unsub };
+  return { destroy: () => { unsub(); defense?.destroy(); } };
 }
 
 function cardMenu(p) {

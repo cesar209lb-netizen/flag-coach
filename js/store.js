@@ -3,7 +3,7 @@
 import * as db from './db.js';
 import { defaultSettings, newSeason, seasonNameFor, starterPlays } from './model.js';
 
-export const state = { settings: null, players: [], seasons: [], plays: [], games: [] };
+export const state = { settings: null, players: [], seasons: [], plays: [], games: [], defplays: [] };
 
 const subs = new Set();
 export function subscribe(fn) { subs.add(fn); return () => subs.delete(fn); }
@@ -15,7 +15,7 @@ export const refreshUI = emit;
 // Every local write queues the record for the next push, and every delete
 // leaves a tombstone so the other device learns about it too. Both are inert
 // until a team is paired in Settings.
-const KIND_STORE = { settings: 'meta', player: 'players', season: 'seasons', play: 'plays', game: 'games' };
+const KIND_STORE = { settings: 'meta', player: 'players', season: 'seasons', play: 'plays', game: 'games', defplay: 'defplays' };
 const syncSubs = new Set();
 export function onSyncQueue(fn) { syncSubs.add(fn); return () => syncSubs.delete(fn); }
 
@@ -50,7 +50,7 @@ export async function applyRemote({ kind, id, updatedAt, deleted, data }) {
   if (!storeName) return false;
   const localOf = () => (kind === 'settings' ? state.settings
     : kind === 'play' ? playById(id) : kind === 'player' ? playerById(id)
-      : kind === 'game' ? gameById(id) : seasonById(id));
+      : kind === 'game' ? gameById(id) : kind === 'defplay' ? defPlayById(id) : seasonById(id));
   const local = localOf();
   if (local && (local.updatedAt || 0) > updatedAt) return false;
   applying = true;
@@ -60,6 +60,7 @@ export async function applyRemote({ kind, id, updatedAt, deleted, data }) {
       if (kind === 'play') await deletePlay(id);
       else if (kind === 'player') await deletePlayer(id);
       else if (kind === 'game') await deleteGame(id);
+      else if (kind === 'defplay') await deleteDefPlay(id);
       else await deleteSeason(id);
       await db.put('tombstones', { id: `${kind}:${id}`, kind, ref: id, deletedAt: updatedAt });
       return true;
@@ -72,6 +73,8 @@ export async function applyRemote({ kind, id, updatedAt, deleted, data }) {
       await savePlayer({ ...data, id, updatedAt }, { silent: true });
     } else if (kind === 'game') {
       await saveGame({ ...data, id, updatedAt }, { silent: true });
+    } else if (kind === 'defplay') {
+      await saveDefPlay({ ...data, id, updatedAt }, { silent: true });
     } else {
       await saveSeason({ ...data, id, updatedAt }, { silent: true });
     }
@@ -95,7 +98,7 @@ export async function pendingRecords() {
     }
     const rec = p.kind === 'settings' ? syncedSettings()
       : p.kind === 'play' ? playById(p.ref) : p.kind === 'player' ? playerById(p.ref)
-        : p.kind === 'game' ? gameById(p.ref) : seasonById(p.ref);
+        : p.kind === 'game' ? gameById(p.ref) : p.kind === 'defplay' ? defPlayById(p.ref) : seasonById(p.ref);
     if (!rec) continue;
     rows.push({ key: p.id, kind: p.kind, id: p.ref, updatedAt: rec.updatedAt || Date.now(), deleted: false, data: rec });
   }
@@ -128,6 +131,7 @@ export async function allRecords() {
     ...state.players.map((p) => ({ key: `player:${p.id}`, kind: 'player', id: p.id, updatedAt: p.updatedAt || Date.now(), deleted: false, data: p })),
     ...state.seasons.map((x) => ({ key: `season:${x.id}`, kind: 'season', id: x.id, updatedAt: x.updatedAt || Date.now(), deleted: false, data: x })),
     ...state.games.map((x) => ({ key: `game:${x.id}`, kind: 'game', id: x.id, updatedAt: x.updatedAt || Date.now(), deleted: false, data: x })),
+    ...state.defplays.map((x) => ({ key: `defplay:${x.id}`, kind: 'defplay', id: x.id, updatedAt: x.updatedAt || Date.now(), deleted: false, data: x })),
   ];
 }
 
@@ -157,12 +161,13 @@ async function stripPersonalFields(players) {
 
 export async function loadState() {
   await db.open();
-  const [meta, players, seasons, plays, games] = await Promise.all(['meta', 'players', 'seasons', 'plays', 'games'].map(db.getAll));
+  const [meta, players, seasons, plays, games, defplays] = await Promise.all(['meta', 'players', 'seasons', 'plays', 'games', 'defplays'].map(db.getAll));
   state.settings = { ...defaultSettings(), ...(meta.find((m) => m.id === 'settings') || {}) };
   state.players = await stripPersonalFields(players);
   state.seasons = seasons.sort((a, b) => a.createdAt - b.createdAt);
   state.plays = plays;
   state.games = games.sort((a, b) => (a.date || 0) - (b.date || 0));
+  state.defplays = defplays;
 
   if (!state.seasons.length) {
     const s = newSeason(seasonNameFor());
@@ -211,6 +216,28 @@ export async function savePlay(play, { silent = false } = {}) {
   queue('play', copy.id);
   touched();
   if (!silent) emit();
+}
+
+export const defPlayById = (id) => state.defplays.find((d) => d.id === id);
+
+export async function saveDefPlay(play, { silent = false } = {}) {
+  if (blocked()) return;
+  if (!applying) play.updatedAt = Date.now();
+  const copy = structuredClone(play);
+  upsert(state.defplays, copy);
+  await db.put('defplays', copy);
+  queue('defplay', copy.id);
+  touched();
+  if (!silent) emit();
+}
+
+export async function deleteDefPlay(id) {
+  if (blocked()) return;
+  state.defplays = state.defplays.filter((d) => d.id !== id);
+  await db.del('defplays', id);
+  await tombstone('defplay', id);
+  touched();
+  emit();
 }
 
 export const gameById = (id) => state.games.find((g) => g.id === id);
@@ -321,13 +348,13 @@ export async function deleteSeason(id) {
 export function snapshot() {
   return {
     app: 'flag-coach', version: 1, exportedAt: new Date().toISOString(),
-    meta: [state.settings], players: state.players, seasons: state.seasons, plays: state.plays, games: state.games,
+    meta: [state.settings], players: state.players, seasons: state.seasons, plays: state.plays, games: state.games, defplays: state.defplays,
   };
 }
 
 export async function restoreSnapshot(data) {
   const settings = { ...defaultSettings(), ...(data.meta?.find((m) => m.id === 'settings') || {}), seeded: true };
-  await db.replaceAll({ meta: [settings], players: data.players || [], seasons: data.seasons || [], plays: data.plays || [], games: data.games || [] });
+  await db.replaceAll({ meta: [settings], players: data.players || [], seasons: data.seasons || [], plays: data.plays || [], games: data.games || [], defplays: data.defplays || [] });
   await loadState();
   // On a paired iPad the restored records go up on the next sync, where the
   // team's own newer edits still win on recency.

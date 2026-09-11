@@ -192,6 +192,52 @@ export function applyFormation(play, formationId, W) {
   play.formation = f.name;
 }
 
+// ---------- Defensive calls ----------
+// The coverages in COVERAGES are opponents the simulator generates to test a
+// play against. These are the other thing: the defence this team actually runs,
+// drawn by the coach and taught to the players, with a job written on every
+// defender.
+
+export const DEF_JOBS = [
+  { id: 'rush', label: 'Rush', desc: 'Goes after the quarterback' },
+  { id: 'man', label: 'Man', desc: 'Follows one receiver everywhere' },
+  { id: 'zone', label: 'Zone', desc: 'Guards an area, takes whoever comes in' },
+];
+
+// Five defenders: a rusher, two on the outside, one in the middle and one deep.
+// Spread across the field's width so the call reads the same on any field size.
+const DEF_SPOTS = [
+  { label: 'R', kind: 'rush', dx: 0, y: 8 },
+  { label: 'C1', kind: 'man', target: 'X', dx: -11, y: 5.5 },
+  { label: 'C2', kind: 'man', target: 'Z', dx: 11, y: 5.5 },
+  { label: 'LB', kind: 'man', target: 'Y', dx: -3, y: 5 },
+  { label: 'S', kind: 'zone', dx: 3, y: 12, deep: true },
+];
+
+export const newDefPlay = ({ name = 'New Defense', W = 30 } = {}) => ({
+  id: uid(), name, notes: '', tags: [], rating: 0, showAgainst: 'spread',
+  defenders: DEF_SPOTS.map((d) => ({
+    id: uid(), label: d.label, kind: d.kind, target: d.target || null,
+    deep: !!d.deep, shade: 0,
+    x: r2(W / 2 + (d.dx * W) / 30), y: d.y,
+  })),
+  createdAt: Date.now(), updatedAt: Date.now(),
+});
+
+// The offence to draw behind a defensive call, so a defender can see what they
+// are lining up against. Ghosts only — never saved into the call.
+export function ghostOffense(formationId, W) {
+  const f = FORMATIONS.find((x) => x.id === formationId) || FORMATIONS[0];
+  return SLOTS.map((slot) => {
+    const { x, y, label } = formationPos(f, slot, W);
+    return { slot, label, x, y, route: [], routeId: null, motion: [], read: null, assigned: null, delay: 0 };
+  });
+}
+
+export const defJobLabel = (d) => (d.kind === 'rush' ? 'Rush'
+  : d.kind === 'man' ? `Man on ${d.target || '—'}`
+    : d.deep ? 'Deep zone' : 'Short zone');
+
 // ---------- Routes ----------
 // Route points are [out, depth]: "out" is toward the receiver's nearest sideline.
 

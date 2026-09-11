@@ -492,7 +492,7 @@ export function mount(root, playId) {
       resultPill.hidden = !show;
       if (show) {
         resultPill.className = `result-pill tone-${r.tone}`;
-        resultPill.replaceChildren(h('strong', null, r.title), r.detail ? h('span', null, r.detail) : null);
+        resultPill.replaceChildren(...[h('strong', null, r.title), r.detail ? h('span', null, r.detail) : null].filter(Boolean));
       }
     }
     if (playingShown !== st.playing) {

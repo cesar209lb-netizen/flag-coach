@@ -2,9 +2,9 @@
 // js/sync.js optionally mirrors it to a shared team store.
 
 const NAME = 'flagcoach';
-const VERSION = 3;
+const VERSION = 4;
 // The stores that hold team content: what backups carry and what sync mirrors.
-export const STORES = ['meta', 'players', 'seasons', 'plays', 'games'];
+export const STORES = ['meta', 'players', 'seasons', 'plays', 'games', 'defplays'];
 // Sync bookkeeping. Kept out of STORES so a restore or erase leaves the
 // device's pairing alone.
 export const SYNC_STORES = ['pending', 'tombstones', 'sync'];
