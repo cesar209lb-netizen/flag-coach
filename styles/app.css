@@ -698,3 +698,43 @@ textarea.input { resize: vertical; line-height: 1.45; }
   .cs-item { break-inside: avoid; page-break-inside: avoid; }
   @page { margin: 12mm; }
 }
+
+/* ---------- Game day ---------- */
+.gd-opponent { color: var(--muted); font-weight: 650; font-size: 15px; text-align: left; }
+.gd-board { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center;
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 14px; }
+.gd-score-col { text-align: center; min-width: 0; }
+.gd-score-label { color: var(--muted); font-weight: 700; font-size: 13px; text-transform: uppercase;
+  letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-score { font-family: var(--round); font-size: 54px; font-weight: 850; line-height: 1.05; }
+.gd-dd { text-align: center; }
+.gd-dd-main { display: flex; flex-direction: column; gap: 2px; padding: 6px 14px; border-radius: 12px; background: var(--bg2); }
+.gd-down { font-size: 26px; font-weight: 850; }
+.gd-togo { color: var(--muted); font-weight: 700; }
+.gd-callrow { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+.btn.big, .gd-buttons .btn { min-height: 54px; font-size: 16px; font-weight: 750; }
+.gd-result { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
+.gd-pending { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.gd-yards { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
+.gd-yard-val { font-family: var(--round); font-size: 22px; font-weight: 800; min-width: 84px; text-align: center; }
+.gd-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.tone-great, .tone-good { background: rgba(34, 197, 94, .16); color: #86efac; }
+.tone-warn { background: rgba(250, 204, 21, .16); color: #fde68a; }
+.tone-bad { background: rgba(239, 68, 68, .16); color: #fca5a5; }
+.gd-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 8px; }
+.gd-summary > div { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+.gd-summary b { display: block; font-family: var(--round); font-size: 24px; font-weight: 850; }
+.gd-summary small { color: var(--muted); font-size: 12px; }
+.gd-log { display: flex; flex-direction: column; gap: 4px; }
+.gd-log-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; }
+.gd-log-dd { color: var(--muted); font-size: 12px; font-weight: 700; min-width: 62px; }
+.gd-log-res { font-family: var(--round); font-weight: 800; padding: 2px 8px; border-radius: 8px; }
+.gd-picklist { display: flex; flex-direction: column; gap: 6px; }
+.gd-pick { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); }
+.gd-pick-num { font-family: var(--round); font-weight: 800; color: var(--muted); min-width: 22px; }
+.gd-pick-name { font-weight: 750; }
+.gd-pick .ic { width: 18px; height: 18px; color: var(--muted); }
+.gd-game-row { text-align: left; }
+.play-real { color: #86efac; font-size: 12px; font-weight: 700; margin-top: 2px; }

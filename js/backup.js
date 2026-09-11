@@ -57,7 +57,7 @@ export function restoreBackup() {
     const when = data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'unknown date';
     const ok = await confirmDialog({
       title: 'Restore this backup?',
-      message: `Backup from ${when}: ${data.plays.length} plays, ${data.players?.length || 0} players, ${data.seasons?.length || 0} seasons. Everything currently on this device will be replaced.`,
+      message: `Backup from ${when}: ${data.plays.length} plays, ${data.players?.length || 0} players, ${data.seasons?.length || 0} seasons, ${data.games?.length || 0} games. Everything currently on this device will be replaced.`,
       confirmText: 'Replace & restore', danger: true,
     });
     if (!ok) return;

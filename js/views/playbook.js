@@ -2,7 +2,7 @@
 
 import { h, icon, iconBtn, btn, stars, openSheet, actionSheet, confirmDialog, toast, segmented } from '../ui.js';
 import { state, subscribe, savePlay, deletePlay } from '../store.js';
-import { FORMATIONS, newPlay, copyPlay, flipPlay } from '../model.js';
+import { FORMATIONS, newPlay, copyPlay, flipPlay, playStats } from '../model.js';
 import { playThumb } from '../field.js';
 import { openHuddle } from './huddle.js';
 import { isViewer } from '../sync.js';
@@ -78,6 +78,11 @@ export function mount(root) {
         h('div', { class: 'play-card-info' },
           h('div', { class: 'play-name' }, p.name),
           h('div', { class: 'play-meta' }, p.formation || ''),
+          (() => {
+            // What the play actually did in games, next to what it is rated.
+            const st = playStats(state.games, p.id);
+            return st ? h('div', { class: 'play-real' }, `${st.calls} called · ${st.avg} avg${st.tds ? ` · ${st.tds} TD` : ''}`) : null;
+          })(),
           h('div', { class: 'play-card-row' },
             stars(p.rating || 0, { size: 'sm' }),
             p.tags.length ? h('div', { class: 'tag-list' }, p.tags.slice(0, 2).map((t) => h('span', { class: 'tag' }, t))) : null)),

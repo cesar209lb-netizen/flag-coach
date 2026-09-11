@@ -77,6 +77,41 @@ export function seasonNameFor(date = new Date()) {
 
 export const newSeason = (name) => ({ id: uid(), name, createdAt: Date.now(), roster: [] });
 
+// A game logged from the sideline. `log` is every play called, in order, with
+// what it actually did — which is the only way the app ever learns whether a
+// play works against real people rather than the simulation.
+export const newGame = (seasonId, opponent = '') => ({
+  id: uid(), seasonId, opponent, date: Date.now(),
+  us: 0, them: 0, down: 1, toGo: 10, log: [],
+  createdAt: Date.now(), updatedAt: Date.now(),
+});
+
+// What a logged play did. Yards are the yards gained on that snap.
+export const PLAY_RESULTS = [
+  { id: 'td', label: 'Touchdown', tone: 'great' },
+  { id: 'gain', label: 'Gain', tone: 'good' },
+  { id: 'none', label: 'No gain', tone: 'warn' },
+  { id: 'loss', label: 'Loss / sack', tone: 'bad' },
+  { id: 'turnover', label: 'Turnover', tone: 'bad' },
+];
+
+// Rolled up per play id: how often it was called and what it actually did.
+export function playStats(games, playId) {
+  let calls = 0, yards = 0, tds = 0, worked = 0, turnovers = 0;
+  for (const g of games) {
+    for (const e of g.log || []) {
+      if (e.playId !== playId) continue;
+      calls++;
+      yards += e.yards || 0;
+      if (e.result === 'td') { tds++; worked++; } else if (e.result === 'gain') worked++;
+      if (e.result === 'turnover') turnovers++;
+    }
+  }
+  return calls
+    ? { calls, yards, tds, turnovers, avg: Math.round((yards / calls) * 10) / 10, workRate: Math.round((worked / calls) * 100) }
+    : null;
+}
+
 // Deliberately minimal: a first name, a photo, and the jersey number on the
 // season entry. No surname, contact or medical field — this syncs to a store on
 // the internet, and none of that belongs there for a child.

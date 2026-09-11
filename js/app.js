@@ -12,15 +12,17 @@ import * as Roster from './views/roster.js';
 import * as Settings from './views/settings.js';
 import * as RouteLab from './views/routelab.js';
 import * as CallSheet from './views/callsheet.js';
+import * as Game from './views/game.js';
 
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'playbook', label: 'Playbook', icon: 'playbook' },
   { id: 'routes', label: 'Routes', icon: 'route' },
+  { id: 'game', label: 'Game', icon: 'whistle', coachOnly: true },
   { id: 'roster', label: 'Roster', icon: 'users', coachOnly: true },
   { id: 'settings', label: 'Settings', icon: 'sliders' },
 ];
-const VIEWS = { home: Home, playbook: Playbook, routes: RouteLab, roster: Roster, settings: Settings, callsheet: CallSheet };
+const VIEWS = { home: Home, playbook: Playbook, routes: RouteLab, roster: Roster, settings: Settings, callsheet: CallSheet, game: Game };
 
 const viewEl = document.getElementById('view');
 const tabbar = document.getElementById('tabbar');
@@ -43,7 +45,7 @@ function route() {
     if (code) setTimeout(() => joinFromLink(code, route), 0);
   }
   // Player view has no editor and no roster; send those back to the playbook.
-  if (sync.isViewer() && (name === 'roster' || name === 'play')) {
+  if (sync.isViewer() && (name === 'roster' || name === 'play' || name === 'game' || name === 'callsheet')) {
     const playId = name === 'play' ? arg : null;
     history.replaceState(null, '', '#/playbook');
     name = 'playbook';
