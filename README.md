@@ -121,6 +121,48 @@ their shoulder is the side they're shading.
 Defense tab → **vs every look** simulates the play against all nine alignments at
 once, which is the fastest way to find the one that breaks it.
 
+## Call sheet
+
+Playbook → **Call sheet** picks the plays you are carrying, numbers them for
+calling, and prints — Safari's Share → Print, or screenshot it.
+
+Two shapes. **Sheet** is the laminated page: diagrams, formation, tags and
+notes, two to four across. **Wristband** is the strip for the plastic window on
+a quarterback's arm — numbers and names in two columns, nothing that will not
+fit. Defensive calls go on the end of either one.
+
+The field is drawn in a paper palette here: white grass, grey lines. A sheet in
+the app's greens comes out of a printer as a page of solid ink.
+
+## Game day
+
+The **Game** tab keeps score and records what you called. Pick a play from the
+numbered list, tap Touchdown, Gain, No gain, Loss or Turnover, and that is the
+snap logged. Down and distance keep themselves — the chains move, downs
+advance, four and out starts a new series — and **Undo last** fixes a wrong tap.
+
+Those results come back to the playbook: a play carries its real average and
+touchdown count next to its rating, so you can see whether the thing that works
+in the simulation works against people.
+
+Games sync between coaches and ride along in backups. Player devices never
+receive them.
+
+## Defensive playbook
+
+Playbook has an **Offense / Defense** toggle. A defensive call is five
+defenders you drag to where they line up, each with a job: rush, man on a
+receiver, or a short or deep zone. The picture carries the assignment — a
+dashed line to whoever a man defender has, an ellipse for a zone — over a
+ghosted offence in whichever formation you want to see it against.
+
+**Show the team** puts it full screen with every assignment written across the
+top, which is the whiteboard picture without the whiteboard.
+
+These are not the same thing as the coverages in the play designer. Those are
+opponents the simulator invents to test an offensive play against. These are
+the defence you actually run and teach.
+
 ## Backups
 
 Settings → **Save backup** creates one `.json` file (plays, roster, photos, seasons). Save it to iCloud Drive. **Restore from backup** replaces everything on the device with the file's contents.
@@ -134,5 +176,6 @@ Settings → **Save backup** creates one `.json` file (plays, roster, photos, se
 | `js/sim.js` | `alignDefense` (pre-snap alignment) plus the play simulation: routes, motion, ball, defense, rusher, results |
 | `js/stage.js` | Draws and plays back a simulated play |
 | `js/field.js` | SVG field, routes, player tokens |
-| `js/views/*` | Home, Playbook, Play editor, Huddle, Roster, Settings |
+| `js/views/*` | Home, Playbook, Play editor, Huddle, Roster, Settings, Call sheet, Game day, Defense |
+| `js/qr.js` | QR encoder for join links, so invites work with no signal |
 | `sw.js` | Offline cache |

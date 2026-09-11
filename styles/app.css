@@ -759,3 +759,5 @@ textarea.input { resize: vertical; line-height: 1.45; }
   .def-edit { grid-template-columns: 1fr; }
   .def-fieldwrap { aspect-ratio: 31 / 28; }
 }
+.cs-sub { font-weight: 800; font-size: 15px; margin: 18px 0 8px; padding-top: 12px; border-top: 2px solid #cbd5e1; }
+.cs-num.def { background: #b91c1c; }

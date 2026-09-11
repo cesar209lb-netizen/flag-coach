@@ -8,11 +8,14 @@
 import { h, iconBtn, btn, segmented, toast } from '../ui.js';
 import { state, subscribe } from '../store.js';
 import { playThumb } from '../field.js';
+import { defThumb } from './defense.js';
+import { defJobLabel } from '../model.js';
 
 let mode = 'sheet';
 let cols = 3;
 let showNotes = true;
 let tagFilter = 'All';
+let withDefense = true;
 // Which plays are on the sheet. Null means "everything that matches the tag",
 // so a coach who never touches the checkboxes still gets a usable sheet.
 let chosen = null;
@@ -63,7 +66,10 @@ function build() {
         (v) => { cols = v; rerender(); }, { cls: 'small' })) : null,
     mode === 'sheet' ? h('div', { class: 'cs-ctl' }, h('span', { class: 'field-label' }, 'Notes'),
       segmented([{ value: true, label: 'Show' }, { value: false, label: 'Hide' }], showNotes,
-        (v) => { showNotes = v; rerender(); }, { cls: 'small' })) : null);
+        (v) => { showNotes = v; rerender(); }, { cls: 'small' })) : null,
+    state.defplays.length ? h('div', { class: 'cs-ctl' }, h('span', { class: 'field-label' }, 'Defense'),
+      segmented([{ value: true, label: 'Include' }, { value: false, label: 'Leave off' }], withDefense,
+        (v) => { withDefense = v; rerender(); }, { cls: 'small' })) : null);
 
   // Tag chips narrow the pool; the checkboxes below trim it by hand.
   const used = new Set(state.plays.flatMap((p) => p.tags));
@@ -114,7 +120,21 @@ function build() {
         : h('ol', { class: 'cs-band' }, ...list.map((p) => h('li', null,
           h('span', { class: 'cs-name' }, p.name),
           h('span', { class: 'cs-meta' }, p.formation || '')))))
-      : h('p', { class: 'p-help' }, 'No plays chosen yet.'));
+      : h('p', { class: 'p-help' }, 'No plays chosen yet.'),
+    withDefense && state.defplays.length
+      ? h('div', { class: 'cs-def' },
+        h('div', { class: 'cs-sub' }, 'Defense'),
+        mode === 'sheet'
+          ? h('div', { class: 'cs-grid' }, ...state.defplays.map((d, i) => h('div', { class: 'cs-item' },
+            h('div', { class: 'cs-item-head' },
+              h('span', { class: 'cs-num def' }, `D${i + 1}`),
+              h('span', { class: 'cs-name' }, d.name)),
+            h('div', { class: 'cs-thumb', html: defThumb(d, W, { paper: true }) }),
+            h('div', { class: 'cs-meta' }, d.defenders.map((x) => `${x.label}: ${defJobLabel(x)}`).join(' · ')))))
+          : h('ol', { class: 'cs-band' }, ...state.defplays.map((d) => h('li', null,
+            h('span', { class: 'cs-name' }, d.name),
+            h('span', { class: 'cs-meta' }, d.defenders.map((x) => x.label).join(' · '))))))
+      : null);
 
   return h('div', { class: 'page callsheet' }, top, controls, chips, picker, page);
 }
