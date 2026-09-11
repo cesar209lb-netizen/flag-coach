@@ -16,19 +16,25 @@ export function viewBox(W, v = EDIT_VIEW, pad = 0.8) {
   return `${-pad} ${-v.yMax} ${W + pad * 2} ${v.yMax - v.yMin}`;
 }
 
-export function fieldMarkup(W, { view = EDIT_VIEW, rushDistance = 8, showRush = true, numbers = true, pad = 0.8 } = {}) {
+// Screen greens, and a paper palette for anything headed to a printer — a
+// call sheet full of grass would be a page of solid ink.
+const TURF = { out: '#1a5424', odd: '#2d8739', even: '#287c33', line: '#fff', lineOp: '.42', tick: '.3', edge: '.9' };
+const PAPER = { out: '#fff', odd: '#f7f9f7', even: '#fff', line: '#64748b', lineOp: '.55', tick: '.4', edge: '.85' };
+
+export function fieldMarkup(W, { view = EDIT_VIEW, rushDistance = 8, showRush = true, numbers = true, pad = 0.8, paper = false } = {}) {
   const top = -view.yMax;
   const height = view.yMax - view.yMin;
-  let s = `<rect x="${-pad - 1}" y="${top - 1}" width="${W + pad * 2 + 2}" height="${height + 2}" fill="#1a5424"/>`;
+  const c = paper ? PAPER : TURF;
+  let s = `<rect x="${-pad - 1}" y="${top - 1}" width="${W + pad * 2 + 2}" height="${height + 2}" fill="${c.out}"/>`;
   for (let y = Math.floor(view.yMin / 5) * 5; y < view.yMax; y += 5) {
-    s += `<rect x="0" y="${-(y + 5)}" width="${W}" height="5" fill="${Math.abs(y / 5) % 2 ? '#2d8739' : '#287c33'}"/>`;
+    s += `<rect x="0" y="${-(y + 5)}" width="${W}" height="5" fill="${Math.abs(y / 5) % 2 ? c.odd : c.even}"/>`;
   }
   for (let y = Math.ceil(view.yMin); y <= view.yMax; y++) {
     if (y === 0) continue;
     if (y % 5 === 0) {
-      s += `<line x1="0" x2="${W}" y1="${-y}" y2="${-y}" stroke="#fff" stroke-opacity=".42" stroke-width=".12"/>`;
+      s += `<line x1="0" x2="${W}" y1="${-y}" y2="${-y}" stroke="${c.line}" stroke-opacity="${c.lineOp}" stroke-width=".12"/>`;
     } else {
-      s += `<path d="M0 ${-y}h.7M${W - 0.7} ${-y}h.7M${W / 2 - 0.35} ${-y}h.7" stroke="#fff" stroke-opacity=".3" stroke-width=".1"/>`;
+      s += `<path d="M0 ${-y}h.7M${W - 0.7} ${-y}h.7M${W / 2 - 0.35} ${-y}h.7" stroke="${c.line}" stroke-opacity="${c.tick}" stroke-width=".1"/>`;
     }
   }
   if (numbers) {
@@ -37,11 +43,11 @@ export function fieldMarkup(W, { view = EDIT_VIEW, rushDistance = 8, showRush = 
     }
   }
   if (showRush && rushDistance < view.yMax) {
-    s += `<line x1="0" x2="${W}" y1="${-rushDistance}" y2="${-rushDistance}" stroke="#fca5a5" stroke-opacity=".7" stroke-width=".14" stroke-dasharray=".7 .5"/>`;
+    s += `<line x1="0" x2="${W}" y1="${-rushDistance}" y2="${-rushDistance}" stroke="${paper ? '#dc2626' : '#fca5a5'}" stroke-opacity=".7" stroke-width=".14" stroke-dasharray=".7 .5"/>`;
     s += `<text x="${W / 2}" y="${-rushDistance - 0.45}" class="yd rush" font-size=".85" text-anchor="middle">RUSH LINE · ${rushDistance} YDS</text>`;
   }
-  s += `<rect x="0" y="${top - 1}" width="${W}" height="${height + 2}" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width=".22"/>`;
-  s += `<line x1="0" x2="${W}" y1="0" y2="0" stroke="#60a5fa" stroke-width=".3"/>`;
+  s += `<rect x="0" y="${top - 1}" width="${W}" height="${height + 2}" fill="none" stroke="${c.line}" stroke-opacity="${c.edge}" stroke-width=".22"/>`;
+  s += `<line x1="0" x2="${W}" y1="0" y2="0" stroke="${paper ? '#2563eb' : '#60a5fa'}" stroke-width=".3"/>`;
   return s;
 }
 
@@ -187,9 +193,9 @@ export function ballMarkup() {
     <path d="M-.22 0H.22M-.12-.08v.16M0-.08v.16M.12-.08v.16" stroke="#fff" stroke-width=".05"/></g>`;
 }
 
-export function playThumb(play, W, rushDistance = 8) {
-  return `<svg class="field-svg thumb" viewBox="${viewBox(W, THUMB_VIEW, 0.3)}" preserveAspectRatio="xMidYMid slice">
-    ${fieldMarkup(W, { view: THUMB_VIEW, rushDistance, showRush: false, numbers: false, pad: 0.3 })}
+export function playThumb(play, W, rushDistance = 8, { paper = false } = {}) {
+  return `<svg class="field-svg thumb${paper ? ' paper' : ''}" viewBox="${viewBox(W, THUMB_VIEW, 0.3)}" preserveAspectRatio="xMidYMid slice">
+    ${fieldMarkup(W, { view: THUMB_VIEW, rushDistance, showRush: false, numbers: false, pad: 0.3, paper })}
     ${routesMarkup(play, { badges: false, scale: 1.25 })}
     ${play.players.map((p) => `<g transform="translate(${f2(p.x)} ${f2(-p.y)})">${tokenMarkup(p, {}, { r: 1.2 })}</g>`).join('')}
   </svg>`;

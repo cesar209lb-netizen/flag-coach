@@ -11,6 +11,7 @@ import * as Editor from './views/editor.js';
 import * as Roster from './views/roster.js';
 import * as Settings from './views/settings.js';
 import * as RouteLab from './views/routelab.js';
+import * as CallSheet from './views/callsheet.js';
 
 const TABS = [
   { id: 'home', label: 'Home', icon: 'home' },
@@ -19,7 +20,7 @@ const TABS = [
   { id: 'roster', label: 'Roster', icon: 'users', coachOnly: true },
   { id: 'settings', label: 'Settings', icon: 'sliders' },
 ];
-const VIEWS = { home: Home, playbook: Playbook, routes: RouteLab, roster: Roster, settings: Settings };
+const VIEWS = { home: Home, playbook: Playbook, routes: RouteLab, roster: Roster, settings: Settings, callsheet: CallSheet };
 
 const viewEl = document.getElementById('view');
 const tabbar = document.getElementById('tabbar');
@@ -55,7 +56,8 @@ function route() {
   viewEl.scrollTop = 0;
   const inEditor = name === 'play';
   document.body.classList.toggle('in-editor', inEditor);
-  renderTabs(inEditor ? 'playbook' : VIEWS[name] ? name : 'home');
+  // The call sheet is reached from the playbook and belongs to it in the tab bar.
+  renderTabs(inEditor || name === 'callsheet' ? 'playbook' : VIEWS[name] ? name : 'home');
   try {
     current = inEditor ? Editor.mount(viewEl, arg) : (VIEWS[name] || Home).mount(viewEl);
   } catch (e) {

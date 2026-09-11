@@ -25,6 +25,7 @@ export function mount(root) {
       h('div', { class: 'head-actions' },
         btn(isViewer() ? 'Watch all' : 'Huddle', () => { const l = filtered(); if (l.length) openHuddle(l.map((p) => p.id), 0); },
           { iconName: 'expand', kind: isViewer() ? 'primary' : 'ghost' }),
+        isViewer() ? null : btn('Call sheet', () => { location.hash = '#/callsheet'; }, { iconName: 'download', kind: 'ghost' }),
         isViewer() ? null : btn('New Play', openNewPlaySheet, { iconName: 'plus', kind: 'primary' }))),
     h('div', { class: 'toolbar' }, h('div', { class: 'search-wrap' }, icon('search'), search), sortWrap),
     chipsEl, gridEl));
