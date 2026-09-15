@@ -22,13 +22,41 @@ let sort = 'recent';
 // are looking at rather than spending another tab on it.
 let book = 'offense';
 
-// Which formation's plays are open. null is the formation picker — the screen
-// you land on — and ALL is the everything-at-once list. No formation is named
-// like the sentinel, so it can never collide with a real group.
-const ALL = '\\all';
+// Which formation's plays are open lives in the address — #/playbook is the
+// picker you land on, #/playbook/Trips%20Right is one formation's plays, and
+// #/playbook/all is the everything-at-once list. Keeping it there is what makes
+// the Playbook tab (and the iPad's back gesture) a way back to the picker
+// rather than a tap that does nothing. No formation is named "all": they all
+// come from the model's list or a mirror of one.
+const ALL = 'all';
 let formation = null;
 
-export function mount(root) {
+const pathFor = (f) => (f == null ? '#/playbook' : `#/playbook/${f === ALL ? ALL : encodeURIComponent(f)}`);
+
+function parseFormation(arg) {
+  if (!arg) return null;
+  if (arg === ALL) return ALL;
+  // A hand-typed address can carry a broken escape; that is the picker, not a crash.
+  try { return decodeURIComponent(arg); } catch { return null; }
+}
+
+// Where "back to the playbook" should land from a play: the formation you were
+// browsing, unless it has emptied out since — its last play flipped onto the
+// mirrored formation, or you just deleted it — in which case the picker, rather
+// than an empty grid.
+export function playbookHash() {
+  if (formation === null) return pathFor(null);
+  if (formation !== ALL && !state.plays.some((p) => formationKey(p) === formation)) return pathFor(null);
+  return pathFor(formation);
+}
+
+export function mount(root, arg) {
+  const next = parseFormation(arg);
+  // Filters belong to the formation you set them on, but survive a trip into a
+  // play and back.
+  if (next !== formation) { query = ''; tagFilter = 'All'; kindFilter = 'all'; }
+  formation = next;
+
   const listEl = h('div');
   const chipsEl = h('div', { class: 'filter-chips' });
   const countEl = h('span', { class: 'count' });
@@ -58,16 +86,13 @@ export function mount(root) {
       actionsEl),
     bookWrap, bodyEl));
 
-  function openFormation(name) {
-    formation = name;
-    tagFilter = 'All';
-    kindFilter = 'all';
-    query = '';
-    search.value = '';
-    render();
-  }
+  const openFormation = (name) => { location.hash = pathFor(name); };
+
   function backToFormations() {
-    formation = null;
+    if (formation !== null) { location.hash = pathFor(null); return; }
+    // Already on the picker's address, just showing search results across every
+    // formation. The address will not change, so nothing would remount — clear
+    // the search here instead.
     query = '';
     search.value = '';
     render();
@@ -100,11 +125,13 @@ export function mount(root) {
 
   // ---------- Formation picker ----------
 
-  // Every formation with its plays and how they split between pass and run,
-  // ordered by how many plays it holds — the formation the team actually lives
-  // in lands top left, and the ones with nothing in them fall to the end. Ties
-  // keep the order the model lists formations in, with a mirrored variant
-  // ("Trips Left") right after the formation it mirrors and custom last.
+  // The formations this playbook actually runs, with their plays and how those
+  // split between pass and run. A formation with nothing in it is not a card —
+  // the picker is what the team has, and the New Play sheet is where the rest
+  // of the formations live. Ordered by how many plays each holds, so the
+  // formation the team lives in lands top left; ties keep the order the model
+  // lists formations in, with a mirrored variant ("Trips Left") right after the
+  // formation it mirrors and custom last.
   function groups() {
     const byName = new Map();
     for (const p of state.plays) {
@@ -114,7 +141,8 @@ export function mount(root) {
     }
     const out = [];
     const take = (name) => {
-      const plays = byName.get(name) || [];
+      const plays = byName.get(name);
+      if (!plays) return;
       byName.delete(name);
       out.push({ name, plays, ...passRunCount(plays), ...formationInfo(name) });
     };
@@ -131,38 +159,27 @@ export function mount(root) {
     // A formation the app knows is drawn from the model so the card shows the
     // alignment itself; a custom one borrows the picture from one of its plays.
     const sample = g.id ? formationSample(g.name, W) : g.plays[0];
-    return h('button', { class: `formation-card pick ${g.total ? '' : 'empty'}`, onclick: () => openFormation(g.name) },
+    return h('button', { class: 'formation-card pick', onclick: () => openFormation(g.name) },
       h('div', { class: 'thumb-wrap', html: sample ? playThumb(sample, W) : '' }),
       h('div', { class: 'formation-body' },
         h('div', { class: 'formation-name' }, g.name),
         h('div', { class: 'formation-desc' }, g.desc),
-        g.total
-          ? h('div', { class: 'formation-counts' },
-            h('span', { class: 'fc-pill pass' }, `${g.pass} pass`),
-            h('span', { class: 'fc-pill run' }, `${g.run} run`))
-          : h('div', { class: 'formation-counts' }, h('span', { class: 'fc-pill none' }, 'No plays yet'))));
+        h('div', { class: 'formation-counts' },
+          h('span', { class: 'fc-pill pass' }, `${g.pass} pass`),
+          h('span', { class: 'fc-pill run' }, `${g.run} run`))));
   }
 
   function renderPicker() {
     const W = state.settings.fieldWidth;
     const list = groups();
-    const used = list.filter((g) => g.total);
-    const unused = list.filter((g) => !g.total);
-
-    pickEl.replaceChildren(...[
-      used.length
-        ? h('div', { class: 'formation-grid pick' }, ...used.map((g) => formationCard(g, W)))
-        : h('div', { class: 'empty-state' },
-          h('div', { class: 'empty-icon' }, icon('playbook')),
-          h('h3', null, isViewer() ? 'No plays yet' : 'Your playbook is empty'),
-          isViewer() ? h('p', null, 'Your coach has not added any plays yet. They will show up here on their own.')
-            : h('p', null, 'Pick a formation below and draw your first play out of it.')),
-      unused.length && !isViewer()
-        ? h('div', null,
-          h('div', { class: 'section-label' }, used.length ? 'Formations you have not used yet' : 'Formations'),
-          h('div', { class: 'formation-grid pick' }, ...unused.map((g) => formationCard(g, W))))
-        : null,
-    ].filter(Boolean));
+    pickEl.replaceChildren(list.length
+      ? h('div', { class: 'formation-grid pick' }, ...list.map((g) => formationCard(g, W)))
+      : h('div', { class: 'empty-state' },
+        h('div', { class: 'empty-icon' }, icon('playbook')),
+        h('h3', null, isViewer() ? 'No plays yet' : 'Your playbook is empty'),
+        isViewer() ? h('p', null, 'Your coach has not added any plays yet. They will show up here on their own.')
+          : h('p', null, 'Every formation you draw a play out of shows up here.'),
+        isViewer() ? null : btn('Create your first play', () => openNewPlaySheet(), { kind: 'primary', iconName: 'plus' })));
   }
 
   // ---------- Plays in a formation ----------
@@ -290,12 +307,12 @@ export function mount(root) {
       return;
     }
     if (picking()) {
-      const n = groups().filter((g) => g.total).length;
+      const n = groups().length;
       crumbEl.replaceChildren();
       titleEl.textContent = 'Playbook';
       countEl.textContent = state.plays.length
         ? `${state.plays.length} play${state.plays.length === 1 ? '' : 's'} in ${n} formation${n === 1 ? '' : 's'} — pick one to see its plays`
-        : 'Pick a formation to start';
+        : 'No plays yet';
       return;
     }
     crumbEl.replaceChildren(h('button', { class: 'crumb', onclick: backToFormations }, icon('back'), 'All formations'));
@@ -324,10 +341,6 @@ export function mount(root) {
     renderActions();
     if (book === 'offense') renderBody(); else renderHead();
   }
-  // A formation that emptied out while you were away — a play flipped onto its
-  // mirror, deleted, or pulled by a sync — would otherwise leave you looking at
-  // an empty grid wondering where the plays went. Start at the picker instead.
-  if (inFormation() && !state.plays.some((pl) => formationKey(pl) === formation)) formation = null;
   render();
   const unsub = subscribe(render);
   return { destroy: () => { unsub(); defense?.destroy(); } };

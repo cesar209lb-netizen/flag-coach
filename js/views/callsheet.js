@@ -10,6 +10,7 @@ import { state, subscribe } from '../store.js';
 import { playThumb } from '../field.js';
 import { defThumb } from './defense.js';
 import { defJobLabel } from '../model.js';
+import { playbookHash } from './playbook.js';
 
 let mode = 'sheet';
 let cols = 3;
@@ -48,7 +49,7 @@ function build() {
   const season = state.seasons.find((s) => s.id === state.settings.activeSeasonId);
 
   const top = h('div', { class: 'cs-top' },
-    iconBtn('back', () => { location.hash = '#/playbook'; }, { title: 'Back to playbook' }),
+    iconBtn('back', () => { location.hash = playbookHash(); }, { title: 'Back to playbook' }),
     h('div', { class: 'cs-title' }, h('h1', null, 'Call sheet'),
       h('span', { class: 'muted small' }, `${list.length} play${list.length === 1 ? '' : 's'}`)),
     h('div', { class: 'spacer' }),

@@ -200,9 +200,6 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .fc-pill { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .fc-pill.pass { background: rgba(59, 130, 246, .18); color: #93c5fd; }
 .fc-pill.run { background: rgba(34, 197, 94, .16); color: #86efac; }
-.fc-pill.none { background: var(--card2); color: var(--dim); }
-.formation-card.empty { opacity: .72; }
-.formation-card.empty .thumb-wrap { filter: saturate(.45); }
 .section-label { color: var(--muted); font-weight: 700; font-size: 13px; text-transform: uppercase;
   letter-spacing: .05em; margin: 26px 0 10px; }
 .play-section:first-child .section-label { margin-top: 0; }
