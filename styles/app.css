@@ -188,6 +188,42 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .formation-name { font-weight: 750; padding: 8px 10px 0; }
 .formation-desc { color: var(--muted); font-size: 12px; padding: 0 10px 9px; }
 
+/* The formation picker: the first screen of the playbook. Bigger cards than
+   the new-play sheet, because this is where a coach starts every time. */
+.formation-grid.pick { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.formation-card.pick { display: flex; flex-direction: column; border-width: 1px; }
+.formation-card.pick:active { border-color: var(--accent2); opacity: .9; }
+.formation-card.pick .formation-name { padding: 0; font-size: 17px; }
+.formation-card.pick .formation-desc { padding: 0; }
+.formation-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; }
+.formation-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.fc-pill { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.fc-pill.pass { background: rgba(59, 130, 246, .18); color: #93c5fd; }
+.fc-pill.run { background: rgba(34, 197, 94, .16); color: #86efac; }
+.fc-pill.none { background: var(--card2); color: var(--dim); }
+.formation-card.empty { opacity: .72; }
+.formation-card.empty .thumb-wrap { filter: saturate(.45); }
+.section-label { color: var(--muted); font-weight: 700; font-size: 13px; text-transform: uppercase;
+  letter-spacing: .05em; margin: 26px 0 10px; }
+.play-section:first-child .section-label { margin-top: 0; }
+.play-section + .play-section { margin-top: 4px; }
+
+/* Breadcrumb back out of a formation, above the page title. */
+.crumb-row:empty { display: none; }
+.crumb { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 700;
+  font-size: 13px; padding: 4px 8px 4px 2px; margin-bottom: 2px; border-radius: 8px; }
+.crumb:active { color: var(--text); }
+.crumb .ic { width: 16px; height: 16px; }
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* Pass or run, on the play card, so a call sheet reads at a glance. */
+.play-meta { display: flex; align-items: center; gap: 6px; }
+.kind-tag { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: .03em; flex: none; }
+.kind-tag.pass { background: rgba(59, 130, 246, .18); color: #93c5fd; }
+.kind-tag.run { background: rgba(34, 197, 94, .16); color: #86efac; }
+.play-meta > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ---------- Field SVG ---------- */
 .field-svg { display: block; touch-action: none; }
 .field-svg text { font-family: var(--round); pointer-events: none; }
@@ -212,6 +248,9 @@ textarea.input { resize: vertical; line-height: 1.45; }
 }
 .ed-name:focus { border-color: var(--line); background: var(--bg2); }
 .save-state { color: var(--dim); font-size: 12px; font-weight: 650; white-space: nowrap; }
+/* Flip is the control a coach reaches for most in here, so it says so in words
+   instead of hiding behind a symbol. */
+.ed-top .flip-btn { padding: 0 14px; border-color: var(--line2); }
 .ed-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
 .ed-stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .field-wrap { position: relative; flex: 1; min-height: 0; background: #1a5424; overflow: hidden; }
@@ -618,9 +657,13 @@ textarea.input { resize: vertical; line-height: 1.45; }
 /* ---------- Route lab ---------- */
 .lab .page-head .count { display: block; margin-top: 2px; }
 .lab-field {
-  /* The drill field is taller than it is wide, so cap the width on a big
-     screen rather than pad it out with empty sideline. */
-  position: relative; height: min(56vh, 560px); margin: 10px auto 12px; max-width: 640px;
+  /* Sized by height, with the field's own aspect ratio deciding the width, so
+     the box is exactly the drill and never bands of empty turf. --lab-h is the
+     height budget: short enough on a phone that the route list under it is
+     still on screen. */
+  --lab-h: min(44vh, 460px);
+  position: relative; width: min(100%, calc(var(--lab-h) * var(--lab-ar, .96)));
+  aspect-ratio: var(--lab-ar, .96); margin: 10px auto 12px;
   border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #1a5424;
 }
 .lab-field svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
@@ -633,6 +676,20 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .lab-caption.warn { color: #fca5a5; }
 .chip-grid.routes { display: flex; flex-wrap: wrap; gap: 8px; }
 
+/* From a tablet up the routes sit beside the field instead of under it: the
+   list is the whole point of the lab, and scrolling to reach it on an iPad
+   meant scrolling the field back off screen to use it. */
+@media (min-width: 740px) {
+  .page.lab { padding-bottom: 16px; }
+  .lab-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 300px); gap: 20px; align-items: start; }
+  .lab-main { min-width: 0; }
+  .lab-field { --lab-h: min(58vh, 560px); margin-top: 0; }
+  .lab-side { margin: 0; }
+  .lab-side .chip-grid.routes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .lab-side .chip-btn { min-height: 36px; padding: 0 8px; font-size: 13px; }
+  .lab-side .p-help { font-size: 12px; margin-bottom: 0; }
+}
+
 /* ---------- Responsive ---------- */
 @media (orientation: portrait), (max-width: 900px) {
   .ed-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(260px, 40%); }
@@ -641,6 +698,12 @@ textarea.input { resize: vertical; line-height: 1.45; }
 }
 @media (max-width: 720px) {
   .hide-narrow, .hd-notes { display: none; }
+  /* Squeeze the editor bar rather than push the labelled Flip button off it. */
+  .ed-top { gap: 2px; padding: 6px; }
+  .ed-top .icon-btn { width: 38px; height: 38px; }
+  .ed-name { flex: 1 1 80px; min-width: 60px; font-size: 17px; padding: 6px 8px; }
+  .ed-top .flip-btn { min-height: 38px; padding: 0 10px; font-size: 14px; gap: 5px; }
+  .ed-top .flip-btn .ic { width: 17px; height: 17px; }
   /* Let the huddle controls wrap instead of running off a phone screen. */
   .hd-bottom { flex-wrap: wrap; justify-content: center; gap: 8px; }
   .hd-bottom .spacer { display: none; }
@@ -649,6 +712,20 @@ textarea.input { resize: vertical; line-height: 1.45; }
   .hero { padding: 20px; }
   .hero-title { font-size: 34px; }
   .pe-grid, .ratings-grid, .form-row.three { grid-template-columns: 1fr; }
+  /* No room for a side column on a phone, so buy the route list every pixel
+     the header and the field can spare, and let the readout have a full line
+     of its own rather than a squeezed column between the two controls. */
+  .lab .page-head { margin: 4px 0 8px; gap: 8px; }
+  .lab .page-head h1 { font-size: 26px; }
+  .lab-field { --lab-h: min(36vh, 420px); margin: 6px auto 8px; }
+  .lab-bar { flex-wrap: wrap; margin-bottom: 10px; }
+  .lab-readout { order: 3; flex: 1 1 100%; }
+  /* Two formations across on a phone — one per row turns the picker into a
+     long scroll of giant cards. */
+  .formation-grid.pick { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .formation-card.pick .formation-name { font-size: 15px; }
+  .formation-body { padding: 8px 9px 10px; }
+  .fc-pill { font-size: 11px; padding: 3px 7px; }
   .speed-wrap { display: none; }
 }
 

@@ -26,6 +26,27 @@ Open http://localhost:8080. The dev server disables caching so edits show up on 
 4. Open it once from the Home Screen while online. After that it works with no internet.
 5. Test: turn on Airplane Mode and open the app.
 
+## Playbook
+
+The playbook opens on the **formations**, not on every play at once. Each card
+draws the alignment and says what you have out of it — `3 pass · 1 run` — so a
+formation you have three ways to attack from is obvious next to one you have
+only ever thrown from. They are ordered by how many plays they hold, biggest
+first, so the formation the team actually lives in is top left. Formations you
+have not used yet sit at the bottom, ready to start a play in. The search box
+jumps straight to matching plays across every formation, and **All N plays**
+beside it is the everything-at-once list.
+
+Inside a formation the plays are split into labelled **Pass plays** and **Run
+plays** blocks, each card tagged PASS or RUN, and the **All / Pass / Run**
+filter carries the count of each (picking one collapses to a single grid). A
+play counts as a pass if the quarterback throws it at any point — a flea
+flicker is a pass; a jet sweep, which only ever gets handed off, is a run.
+
+Flipping a play renames its formation with it ("Trips Right" becomes
+"Trips Left"), so a mirrored play gets its own card next to the one it mirrors
+rather than hiding inside it.
+
 ## Route lab
 
 The **Routes** tab is a standalone drill: one QB, one receiver, and a route.
@@ -34,6 +55,11 @@ the ball arrives where the route finishes — a go ball goes deep, a hitch is
 thrown at the hitch — and the readout gives the depth and where it was caught.
 Out, corner and flat break toward the nearest sideline, so **Flip** or dragging
 across the field runs them the other way. Nothing here touches the playbook.
+
+From a tablet up the route list sits beside the field rather than under it, so
+all eighteen routes and the drill are on screen together with nothing to
+scroll — the field box takes the field's own proportions so it is exactly the
+drill and no wasted turf.
 
 ## Sharing a playbook with another coach (team sync)
 

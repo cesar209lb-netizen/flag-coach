@@ -223,16 +223,25 @@ export function mount(root) {
           build();
           toast('Back to the start');
         }, { iconName: 'restart', kind: 'ghost' }))),
-    h('div', { class: 'lab-field' }, svg),
-    h('div', { class: 'lab-bar' },
-      runBtn,
-      h('div', { class: 'lab-readout' }, routeName, caption),
-      h('div', { class: 'spacer' }),
-      speedWrap),
-    h('section', { class: 'card' },
-      h('div', { class: 'card-head' }, h('div', { class: 'card-title' }, 'Pick a route')),
-      chipsEl,
-      h('p', { class: 'p-help' }, 'Out, corner and flat break toward the nearest sideline, so drag the receiver to the other side of the field (or tap Flip) to run them the other way.'))));
+    // The route list sits beside the field on a tablet rather than under it —
+    // on an iPad the whole point of the lab is below the fold otherwise.
+    h('div', { class: 'lab-body' },
+      h('div', { class: 'lab-main' },
+          // The box takes the field's own proportions, so it never pads the
+        // drill out with bands of empty turf above and below.
+        h('div', {
+          class: 'lab-field',
+          style: { '--lab-ar': String(r2((W + 1.6) / (LAB_VIEW.yMax - LAB_VIEW.yMin))) },
+        }, svg),
+        h('div', { class: 'lab-bar' },
+          runBtn,
+          h('div', { class: 'lab-readout' }, routeName, caption),
+          h('div', { class: 'spacer' }),
+          speedWrap)),
+      h('section', { class: 'card lab-side' },
+        h('div', { class: 'card-head' }, h('div', { class: 'card-title' }, 'Pick a route')),
+        chipsEl,
+        h('p', { class: 'p-help' }, 'Out, corner and flat break toward the nearest sideline, so drag the receiver to the other side of the field (or tap Flip) to run them the other way.')))));
 
   renderChips();
   renderSpeed();

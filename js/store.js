@@ -1,7 +1,7 @@
 // In-memory app state, persisted write-through to IndexedDB.
 
 import * as db from './db.js';
-import { defaultSettings, newSeason, seasonNameFor, starterPlays } from './model.js';
+import { DEFAULT_TAGS, defaultSettings, newSeason, seasonNameFor, starterPlays } from './model.js';
 
 export const state = { settings: null, players: [], seasons: [], plays: [], games: [], defplays: [] };
 
@@ -163,6 +163,10 @@ export async function loadState() {
   await db.open();
   const [meta, players, seasons, plays, games, defplays] = await Promise.all(['meta', 'players', 'seasons', 'plays', 'games', 'defplays'].map(db.getAll));
   state.settings = { ...defaultSettings(), ...(meta.find((m) => m.id === 'settings') || {}) };
+  // A tag preset added in a later version has to reach playbooks started before
+  // it. Tags are only ever added in the app, never removed, so folding the
+  // defaults back in can't resurrect anything a coach got rid of.
+  state.settings.tags = [...DEFAULT_TAGS, ...state.settings.tags.filter((t) => !DEFAULT_TAGS.includes(t))];
   state.players = await stripPersonalFields(players);
   state.seasons = seasons.sort((a, b) => a.createdAt - b.createdAt);
   state.plays = plays;

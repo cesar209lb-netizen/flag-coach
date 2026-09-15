@@ -1,8 +1,13 @@
-// Playbook grid: search, filter by tag, sort, create, duplicate, delete.
+// Playbook: pick a formation first, then the plays that run out of it.
+// Inside a formation: search, filter by pass/run and tag, sort, create,
+// duplicate, delete.
 
 import { h, icon, iconBtn, btn, stars, openSheet, actionSheet, confirmDialog, toast, segmented } from '../ui.js';
 import { state, subscribe, savePlay, deletePlay } from '../store.js';
-import { FORMATIONS, newPlay, copyPlay, flipPlay, playStats } from '../model.js';
+import {
+  FORMATIONS, newPlay, copyPlay, flipPlay, playStats,
+  formationKey, formationInfo, formationSample, isPassPlay, passRunCount,
+} from '../model.js';
 import { playThumb } from '../field.js';
 import { openHuddle } from './huddle.js';
 import { isViewer } from '../sync.js';
@@ -10,75 +15,167 @@ import { defenseGrid } from './defense.js';
 
 let query = '';
 let tagFilter = 'All';
+let kindFilter = 'all';
 let sort = 'recent';
 
 // Offence and defence are both the playbook; a toggle switches which one you
 // are looking at rather than spending another tab on it.
 let book = 'offense';
 
+// Which formation's plays are open. null is the formation picker — the screen
+// you land on — and ALL is the everything-at-once list. No formation is named
+// like the sentinel, so it can never collide with a real group.
+const ALL = '\\all';
+let formation = null;
+
 export function mount(root) {
-  const gridEl = h('div', { class: 'play-grid' });
+  const listEl = h('div');
   const chipsEl = h('div', { class: 'filter-chips' });
   const countEl = h('span', { class: 'count' });
+  const crumbEl = h('div', { class: 'crumb-row' });
+  const titleEl = h('h1', null, 'Playbook');
   const search = h('input', { class: 'input search', type: 'search', placeholder: 'Search plays, formations, tags', value: query });
-  search.addEventListener('input', () => { query = search.value; renderGrid(); });
-  const sortWrap = h('div');
+  search.addEventListener('input', () => { query = search.value; renderBody(); });
+  const filterWrap = h('div', { class: 'filter-row' });
+  const searchWrap = h('div', { class: 'search-wrap' }, icon('search'), search);
+  const toolbar = h('div', { class: 'toolbar' }, searchWrap, filterWrap);
+
+  const pickEl = h('div', { class: 'formation-pick' });
+  const playsEl = h('div', null, chipsEl, listEl);
+  // The toolbar never moves, so typing in the search box never loses focus
+  // when the screen under it is swapped out.
+  const offenseBody = h('div');
+  const offenseEl = h('div', null, toolbar, offenseBody);
 
   const actionsEl = h('div', { class: 'head-actions' });
   const bookWrap = isViewer() ? null : h('div', { class: 'book-toggle' });
-  const offenseEl = h('div', null,
-    h('div', { class: 'toolbar' }, h('div', { class: 'search-wrap' }, icon('search'), search), sortWrap),
-    chipsEl, gridEl);
   const defense = isViewer() ? null : defenseGrid();
   const bodyEl = h('div', null, offenseEl);
 
   root.append(h('div', { class: 'page' },
     h('header', { class: 'page-head' },
-      h('div', null, h('h1', null, 'Playbook'), countEl),
+      h('div', null, crumbEl, titleEl, countEl),
       actionsEl),
     bookWrap, bodyEl));
+
+  function openFormation(name) {
+    formation = name;
+    tagFilter = 'All';
+    kindFilter = 'all';
+    query = '';
+    search.value = '';
+    render();
+  }
+  function backToFormations() {
+    formation = null;
+    query = '';
+    search.value = '';
+    render();
+  }
 
   function renderBook() {
     if (!bookWrap) return;
     bookWrap.replaceChildren(segmented(
       [{ value: 'offense', label: 'Offense' }, { value: 'defense', label: 'Defense' }], book,
       (v) => { book = v; render(); }, { cls: 'small' }));
-    bodyEl.replaceChildren(book === 'defense' ? defense.el : offenseEl);
+    const want = book === 'defense' ? defense.el : offenseEl;
+    if (bodyEl.firstElementChild !== want) bodyEl.replaceChildren(want);
   }
 
   function renderActions() {
     if (book === 'defense') {
       actionsEl.replaceChildren(btn('New defense', () => defense.newCall(), { iconName: 'plus', kind: 'primary' }));
-      countEl.textContent = `${state.defplays.length} defensive call${state.defplays.length === 1 ? '' : 's'}`;
       return;
     }
     actionsEl.replaceChildren(...[
       btn(isViewer() ? 'Watch all' : 'Huddle', () => { const l = filtered(); if (l.length) openHuddle(l.map((p) => p.id), 0); },
         { iconName: 'expand', kind: isViewer() ? 'primary' : 'ghost' }),
       isViewer() ? null : btn('Call sheet', () => { location.hash = '#/callsheet'; }, { iconName: 'download', kind: 'ghost' }),
-      isViewer() ? null : btn('New Play', openNewPlaySheet, { iconName: 'plus', kind: 'primary' }),
+      isViewer() ? null : btn('New Play', () => openNewPlaySheet(currentFormationId()), { iconName: 'plus', kind: 'primary' }),
     ].filter(Boolean));
   }
 
-  function renderSort() {
-    sortWrap.replaceChildren(segmented([
-      { value: 'recent', label: 'Recent' }, { value: 'name', label: 'A–Z' }, { value: 'rating', label: 'Rating' },
-    ], sort, (v) => { sort = v; renderSort(); renderGrid(); }, { cls: 'small' }));
+  const inFormation = () => formation !== null && formation !== ALL;
+  const currentFormationId = () => (inFormation() ? formationInfo(formation).id : null);
+
+  // ---------- Formation picker ----------
+
+  // Every formation with its plays and how they split between pass and run,
+  // ordered by how many plays it holds — the formation the team actually lives
+  // in lands top left, and the ones with nothing in them fall to the end. Ties
+  // keep the order the model lists formations in, with a mirrored variant
+  // ("Trips Left") right after the formation it mirrors and custom last.
+  function groups() {
+    const byName = new Map();
+    for (const p of state.plays) {
+      const k = formationKey(p);
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k).push(p);
+    }
+    const out = [];
+    const take = (name) => {
+      const plays = byName.get(name) || [];
+      byName.delete(name);
+      out.push({ name, plays, ...passRunCount(plays), ...formationInfo(name) });
+    };
+    for (const f of FORMATIONS) {
+      take(f.name);
+      const mirrored = [...byName.keys()].find((n) => formationInfo(n).id === f.id);
+      if (mirrored) take(mirrored);
+    }
+    for (const name of [...byName.keys()].sort()) take(name);
+    return out.map((g, i) => ({ ...g, order: i })).sort((a, b) => b.total - a.total || a.order - b.order);
   }
 
-  function renderChips() {
-    const used = new Set(state.plays.flatMap((p) => p.tags));
-    const tags = ['All', 'Top Rated', ...state.settings.tags.filter((t) => used.has(t))];
-    if (!tags.includes(tagFilter)) tagFilter = 'All';
-    chipsEl.replaceChildren(...tags.map((t) =>
-      h('button', { class: `chip-btn ${tagFilter === t ? 'on' : ''}`, onclick: () => { tagFilter = t; renderChips(); renderGrid(); } },
-        t === 'Top Rated' ? '★ Top Rated' : t)));
+  function formationCard(g, W) {
+    // A formation the app knows is drawn from the model so the card shows the
+    // alignment itself; a custom one borrows the picture from one of its plays.
+    const sample = g.id ? formationSample(g.name, W) : g.plays[0];
+    return h('button', { class: `formation-card pick ${g.total ? '' : 'empty'}`, onclick: () => openFormation(g.name) },
+      h('div', { class: 'thumb-wrap', html: sample ? playThumb(sample, W) : '' }),
+      h('div', { class: 'formation-body' },
+        h('div', { class: 'formation-name' }, g.name),
+        h('div', { class: 'formation-desc' }, g.desc),
+        g.total
+          ? h('div', { class: 'formation-counts' },
+            h('span', { class: 'fc-pill pass' }, `${g.pass} pass`),
+            h('span', { class: 'fc-pill run' }, `${g.run} run`))
+          : h('div', { class: 'formation-counts' }, h('span', { class: 'fc-pill none' }, 'No plays yet'))));
+  }
+
+  function renderPicker() {
+    const W = state.settings.fieldWidth;
+    const list = groups();
+    const used = list.filter((g) => g.total);
+    const unused = list.filter((g) => !g.total);
+
+    pickEl.replaceChildren(...[
+      used.length
+        ? h('div', { class: 'formation-grid pick' }, ...used.map((g) => formationCard(g, W)))
+        : h('div', { class: 'empty-state' },
+          h('div', { class: 'empty-icon' }, icon('playbook')),
+          h('h3', null, isViewer() ? 'No plays yet' : 'Your playbook is empty'),
+          isViewer() ? h('p', null, 'Your coach has not added any plays yet. They will show up here on their own.')
+            : h('p', null, 'Pick a formation below and draw your first play out of it.')),
+      unused.length && !isViewer()
+        ? h('div', null,
+          h('div', { class: 'section-label' }, used.length ? 'Formations you have not used yet' : 'Formations'),
+          h('div', { class: 'formation-grid pick' }, ...unused.map((g) => formationCard(g, W))))
+        : null,
+    ].filter(Boolean));
+  }
+
+  // ---------- Plays in a formation ----------
+
+  function scoped() {
+    return inFormation() ? state.plays.filter((p) => formationKey(p) === formation) : state.plays.slice();
   }
 
   function filtered() {
     const q = query.trim().toLowerCase();
-    let list = state.plays.slice();
+    let list = scoped();
     if (q) list = list.filter((p) => `${p.name} ${p.formation} ${p.tags.join(' ')} ${p.notes || ''}`.toLowerCase().includes(q));
+    if (kindFilter !== 'all') list = list.filter((p) => (isPassPlay(p) ? 'pass' : 'run') === kindFilter);
     if (tagFilter === 'Top Rated') list = list.filter((p) => (p.rating || 0) >= 4);
     else if (tagFilter !== 'All') list = list.filter((p) => p.tags.includes(tagFilter));
     if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
@@ -87,27 +184,70 @@ export function mount(root) {
     return list;
   }
 
+  function renderFilters() {
+    if (picking()) {
+      const n = state.plays.length;
+      filterWrap.replaceChildren(...(n
+        ? [btn(`All ${n} play${n === 1 ? '' : 's'}`, () => openFormation(ALL), { iconName: 'playbook', kind: 'ghost' })]
+        : []));
+      return;
+    }
+    const c = passRunCount(scoped());
+    filterWrap.replaceChildren(
+      segmented([
+        { value: 'all', label: `All ${c.total}` }, { value: 'pass', label: `Pass ${c.pass}` }, { value: 'run', label: `Run ${c.run}` },
+      ], kindFilter, (v) => { kindFilter = v; renderFilters(); renderGrid(); }, { cls: 'small' }),
+      segmented([
+        { value: 'recent', label: 'Recent' }, { value: 'name', label: 'A–Z' }, { value: 'rating', label: 'Rating' },
+      ], sort, (v) => { sort = v; renderFilters(); renderGrid(); }, { cls: 'small' }));
+  }
+
+  function renderChips() {
+    const used = new Set(scoped().flatMap((p) => p.tags));
+    const tags = ['All', 'Top Rated', ...state.settings.tags.filter((t) => used.has(t))];
+    if (!tags.includes(tagFilter)) tagFilter = 'All';
+    chipsEl.replaceChildren(...tags.map((t) =>
+      h('button', { class: `chip-btn ${tagFilter === t ? 'on' : ''}`, onclick: () => { tagFilter = t; renderChips(); renderGrid(); } },
+        t === 'Top Rated' ? '★ Top Rated' : t)));
+  }
+
   function renderGrid() {
     const list = filtered();
     const W = state.settings.fieldWidth;
-    countEl.textContent = `${state.plays.length} play${state.plays.length === 1 ? '' : 's'}`;
+    const one = inFormation();
     if (!list.length) {
-      gridEl.replaceChildren(h('div', { class: 'empty-state' },
+      listEl.replaceChildren(h('div', { class: 'empty-state' },
         h('div', { class: 'empty-icon' }, icon('playbook')),
-        h('h3', null, state.plays.length ? 'No plays match' : isViewer() ? 'No plays yet' : 'Your playbook is empty'),
-        state.plays.length ? h('p', null, 'Try a different search or tag.')
+        h('h3', null, scoped().length ? 'No plays match'
+          : one ? `No plays out of ${formation} yet`
+            : isViewer() ? 'No plays yet' : 'Your playbook is empty'),
+        scoped().length ? h('p', null, 'Try a different search, tag or filter.')
           : isViewer() ? h('p', null, 'Your coach has not added any plays yet. They will show up here on their own.')
-            : btn('Create your first play', openNewPlaySheet, { kind: 'primary', iconName: 'plus' })));
+            : btn(one ? `New ${formation} play` : 'Create your first play',
+              () => openNewPlaySheet(currentFormationId()), { kind: 'primary', iconName: 'plus' })));
       return;
     }
-    const ids = list.map((p) => p.id);
+    // Passes and runs are two different conversations in a huddle, so inside a
+    // formation they get their own labelled block rather than being mixed
+    // together. Filtering to one kind already says which it is, so that view
+    // stays a single grid.
+    const split = kindFilter === 'all';
+    const passes = split ? list.filter(isPassPlay) : [];
+    const runs = split ? list.filter((p) => !isPassPlay(p)) : [];
+    // Huddle mode walks whatever order is on screen, so the ids follow the
+    // blocks rather than the unsplit list.
+    const ordered = split ? [...passes, ...runs] : list;
+    const ids = ordered.map((p) => p.id);
     const viewer = isViewer();
-    gridEl.replaceChildren(...list.map((p, i) => {
+    const card = (p, i) => {
+      const pass = isPassPlay(p);
       const info = [
         h('div', { class: 'thumb-wrap', html: playThumb(p, W) }),
         h('div', { class: 'play-card-info' },
           h('div', { class: 'play-name' }, p.name),
-          h('div', { class: 'play-meta' }, p.formation || ''),
+          h('div', { class: 'play-meta' },
+            h('span', { class: `kind-tag ${pass ? 'pass' : 'run'}` }, pass ? 'Pass' : 'Run'),
+            one ? null : h('span', null, p.formation || '')),
           (() => {
             // What the play actually did in games, next to what it is rated.
             const st = playStats(state.games, p.id);
@@ -125,14 +265,69 @@ export function mount(root) {
         h('div', { class: 'play-card-actions' },
           iconBtn('expand', () => openHuddle(ids, i), { title: viewer ? 'Watch' : 'Huddle mode', cls: 'small' }),
           viewer ? null : iconBtn('more', () => cardMenu(p), { title: 'More', cls: 'small' })));
-    }));
+    };
+
+    if (!split) {
+      listEl.replaceChildren(h('div', { class: 'play-grid' }, ...list.map(card)));
+      return;
+    }
+    let n = 0;
+    const block = (label, plays) => (plays.length
+      ? h('div', { class: 'play-section' },
+        h('div', { class: 'section-label' }, `${label} · ${plays.length}`),
+        h('div', { class: 'play-grid' }, ...plays.map((p) => card(p, n++))))
+      : null);
+    listEl.replaceChildren(...[block('Pass plays', passes), block('Run plays', runs)].filter(Boolean));
+  }
+
+  // The head reads differently on the picker (how big is the playbook) and
+  // inside a formation (what is in this one).
+  function renderHead() {
+    if (book === 'defense') {
+      crumbEl.replaceChildren();
+      titleEl.textContent = 'Playbook';
+      countEl.textContent = `${state.defplays.length} defensive call${state.defplays.length === 1 ? '' : 's'}`;
+      return;
+    }
+    if (picking()) {
+      const n = groups().filter((g) => g.total).length;
+      crumbEl.replaceChildren();
+      titleEl.textContent = 'Playbook';
+      countEl.textContent = state.plays.length
+        ? `${state.plays.length} play${state.plays.length === 1 ? '' : 's'} in ${n} formation${n === 1 ? '' : 's'} — pick one to see its plays`
+        : 'Pick a formation to start';
+      return;
+    }
+    crumbEl.replaceChildren(h('button', { class: 'crumb', onclick: backToFormations }, icon('back'), 'All formations'));
+    const c = passRunCount(scoped());
+    titleEl.textContent = inFormation() ? formation : 'All plays';
+    countEl.textContent = `${c.total} play${c.total === 1 ? '' : 's'} · ${c.pass} pass · ${c.run} run`;
+  }
+
+  // The picker is the landing screen, but a search jumps straight past it to
+  // the matching plays so nobody has to guess which formation a play is in.
+  const picking = () => formation === null && !query.trim();
+
+  function renderBody() {
+    search.placeholder = inFormation() ? `Search ${formation} plays` : 'Search all plays, formations, tags';
+    const screen = picking() ? pickEl : playsEl;
+    if (offenseBody.firstElementChild !== screen) offenseBody.replaceChildren(screen);
+    renderHead();
+    renderFilters();
+    if (picking()) { renderPicker(); return; }
+    renderChips();
+    renderGrid();
   }
 
   function render() {
     renderBook();
     renderActions();
-    if (book === 'offense') { renderSort(); renderChips(); renderGrid(); }
+    if (book === 'offense') renderBody(); else renderHead();
   }
+  // A formation that emptied out while you were away — a play flipped onto its
+  // mirror, deleted, or pulled by a sync — would otherwise leave you looking at
+  // an empty grid wondering where the plays went. Start at the picker instead.
+  if (inFormation() && !state.plays.some((pl) => formationKey(pl) === formation)) formation = null;
   render();
   const unsub = subscribe(render);
   return { destroy: () => { unsub(); defense?.destroy(); } };
@@ -166,9 +361,12 @@ function cardMenu(p) {
   });
 }
 
-export function openNewPlaySheet() {
+// `preferred` is the formation id to start on — the one the coach is already
+// looking at. It is also wired straight to click handlers elsewhere, so
+// anything that is not a known id (an Event, null) falls back to Spread.
+export function openNewPlaySheet(preferred) {
   const W = state.settings.fieldWidth;
-  let formationId = 'spread';
+  let formationId = FORMATIONS.find((f) => f.id === preferred)?.id || 'spread';
   const name = h('input', { class: 'input', placeholder: 'e.g. Red Zone Slants', maxLength: 40 });
   const grid = h('div', { class: 'formation-grid' });
   const renderFormations = () => grid.replaceChildren(...FORMATIONS.map((f) => {

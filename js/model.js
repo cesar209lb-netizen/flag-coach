@@ -19,7 +19,7 @@ export const RATINGS = [
   { key: 'throwing', label: 'Throwing' },
   { key: 'iq', label: 'Football IQ' },
 ];
-export const DEFAULT_TAGS = ['Quick Pass', 'Deep Shot', 'Run', 'Red Zone', 'Short Yardage', 'Trick Play', 'Extra Point'];
+export const DEFAULT_TAGS = ['Quick Pass', 'Intermediate Pass', 'Deep Shot', 'Run', 'Red Zone', 'Short Yardage', 'Trick Play', 'Extra Point'];
 
 export const COVERAGES = [
   { id: 'none', name: 'None', desc: 'Just your routes' },
@@ -287,7 +287,12 @@ export function applyRoute(p, route, W) {
   p.routeId = route.id;
 }
 
-const swapLR = (s) => s.replace(/\b(Right|Left)\b/g, (m) => (m === 'Right' ? 'Left' : 'Right'));
+// Swaps the side named in a play, formation or description, keeping the case
+// it was written in: "Trips Right" ⇄ "Trips Left", "3 receivers right" ⇄ "…left".
+const swapLR = (s) => String(s).replace(/\b(right|left)\b/gi, (m) => {
+  const to = m.toLowerCase() === 'right' ? 'left' : 'right';
+  return m[0] === m[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to;
+});
 
 export function flipPlay(play, W) {
   for (const p of play.players) {
@@ -299,6 +304,44 @@ export function flipPlay(play, W) {
   if (play.defense?.look) play.defense = { ...play.defense, look: mirrorLook(play.defense.look) };
   play.formation = swapLR(play.formation || '');
   play.name = swapLR(play.name);
+}
+
+// ---------- Grouping plays by formation ----------
+// The playbook is organised by formation first, so a coach picks the look they
+// want and only then the play. The formation name on the play is the group key
+// — including the mirrored names a flip produces, like "Trips Left".
+
+export const formationKey = (play) => (play.formation || '').trim() || 'Custom';
+
+// What we know about a formation name: the model formation it came from, and
+// whether it is that formation mirrored.
+export function formationInfo(name) {
+  const f = FORMATIONS.find((x) => x.name === name);
+  if (f) return { id: f.id, name: f.name, desc: f.desc, flipped: false };
+  const base = FORMATIONS.find((x) => x.name === swapLR(name));
+  if (base) return { id: base.id, name, desc: swapLR(base.desc), flipped: true };
+  return { id: null, name, desc: 'Custom alignment', flipped: false };
+}
+
+// An empty play in a formation, for drawing the alignment on a picker card.
+export function formationSample(name, W) {
+  const info = formationInfo(name);
+  if (!info.id) return null;
+  const play = newPlay({ formationId: info.id, W });
+  if (info.flipped) flipPlay(play, W);
+  return play;
+}
+
+// A play is a pass if the quarterback ever throws it. Everything else — a
+// handoff, a pitch, a sweep — is a run, even when it starts out looking like a
+// pass. A flea flicker ends in a throw, so it counts as a pass.
+export const isPassPlay = (play) => (play.ball || []).some((b) => b.type === 'pass');
+
+// How many of a list of plays are passes and how many are runs.
+export function passRunCount(plays) {
+  let pass = 0;
+  for (const p of plays) if (isPassPlay(p)) pass++;
+  return { pass, run: plays.length - pass, total: plays.length };
 }
 
 export function copyPlay(play, nameSuffix = ' (copy)') {
