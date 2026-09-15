@@ -11,6 +11,7 @@ import { EDIT_VIEW, viewBox, fieldMarkup, routesMarkup, tokenMarkup, pathD, zone
 import { simulate, bestThrowTime, alignFor, frameAt } from '../sim.js';
 import { PlayStage, simContext } from '../stage.js';
 import { openHuddle } from './huddle.js';
+import { playbookHash } from './playbook.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -28,7 +29,7 @@ export function mount(root, playId) {
   const stored = playById(playId);
   if (!stored) {
     root.append(h('div', { class: 'page empty-state' }, h('h2', null, 'Play not found'),
-      btn('Back to Playbook', () => { location.hash = '#/playbook'; }, { kind: 'primary' })));
+      btn('Back to Playbook', () => { location.hash = playbookHash(); }, { kind: 'primary' })));
     return {};
   }
 
@@ -62,7 +63,7 @@ export function mount(root, playId) {
   const undoBtn = iconBtn('undo', doUndo, { title: 'Undo' });
   const redoBtn = iconBtn('redo', doRedo, { title: 'Redo' });
   const top = h('header', { class: 'ed-top' },
-    iconBtn('back', () => { location.hash = '#/playbook'; }, { title: 'Back to playbook' }),
+    iconBtn('back', () => { location.hash = playbookHash(); }, { title: 'Back to playbook' }),
     nameInput, saveEl, h('div', { class: 'spacer' }),
     undoBtn, redoBtn,
     btn('Flip', flipCurrent, { iconName: 'flip', kind: 'ghost', cls: 'flip-btn', title: 'Flip the whole play left to right' }),
@@ -832,7 +833,7 @@ export function mount(root, playId) {
     deleted = true;
     clearTimeout(saveTimer);
     await deletePlay(play.id);
-    location.hash = '#/playbook';
+    location.hash = playbookHash();
     toast('Play deleted');
   }
   function moreMenu() {

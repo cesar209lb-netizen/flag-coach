@@ -22,13 +22,41 @@ let sort = 'recent';
 // are looking at rather than spending another tab on it.
 let book = 'offense';
 
-// Which formation's plays are open. null is the formation picker — the screen
-// you land on — and ALL is the everything-at-once list. No formation is named
-// like the sentinel, so it can never collide with a real group.
-const ALL = '\\all';
+// Which formation's plays are open lives in the address — #/playbook is the
+// picker you land on, #/playbook/Trips%20Right is one formation's plays, and
+// #/playbook/all is the everything-at-once list. Keeping it there is what makes
+// the Playbook tab (and the iPad's back gesture) a way back to the picker
+// rather than a tap that does nothing. No formation is named "all": they all
+// come from the model's list or a mirror of one.
+const ALL = 'all';
 let formation = null;
 
-export function mount(root) {
+const pathFor = (f) => (f == null ? '#/playbook' : `#/playbook/${f === ALL ? ALL : encodeURIComponent(f)}`);
+
+function parseFormation(arg) {
+  if (!arg) return null;
+  if (arg === ALL) return ALL;
+  // A hand-typed address can carry a broken escape; that is the picker, not a crash.
+  try { return decodeURIComponent(arg); } catch { return null; }
+}
+
+// Where "back to the playbook" should land from a play: the formation you were
+// browsing, unless it has emptied out since — its last play flipped onto the
+// mirrored formation, or you just deleted it — in which case the picker, rather
+// than an empty grid.
+export function playbookHash() {
+  if (formation === null) return pathFor(null);
+  if (formation !== ALL && !state.plays.some((p) => formationKey(p) === formation)) return pathFor(null);
+  return pathFor(formation);
+}
+
+export function mount(root, arg) {
+  const next = parseFormation(arg);
+  // Filters belong to the formation you set them on, but survive a trip into a
+  // play and back.
+  if (next !== formation) { query = ''; tagFilter = 'All'; kindFilter = 'all'; }
+  formation = next;
+
   const listEl = h('div');
   const chipsEl = h('div', { class: 'filter-chips' });
   const countEl = h('span', { class: 'count' });
@@ -58,16 +86,13 @@ export function mount(root) {
       actionsEl),
     bookWrap, bodyEl));
 
-  function openFormation(name) {
-    formation = name;
-    tagFilter = 'All';
-    kindFilter = 'all';
-    query = '';
-    search.value = '';
-    render();
-  }
+  const openFormation = (name) => { location.hash = pathFor(name); };
+
   function backToFormations() {
-    formation = null;
+    if (formation !== null) { location.hash = pathFor(null); return; }
+    // Already on the picker's address, just showing search results across every
+    // formation. The address will not change, so nothing would remount — clear
+    // the search here instead.
     query = '';
     search.value = '';
     render();
@@ -316,10 +341,6 @@ export function mount(root) {
     renderActions();
     if (book === 'offense') renderBody(); else renderHead();
   }
-  // A formation that emptied out while you were away — a play flipped onto its
-  // mirror, deleted, or pulled by a sync — would otherwise leave you looking at
-  // an empty grid wondering where the plays went. Start at the picker instead.
-  if (inFormation() && !state.plays.some((pl) => formationKey(pl) === formation)) formation = null;
   render();
   const unsub = subscribe(render);
   return { destroy: () => { unsub(); defense?.destroy(); } };

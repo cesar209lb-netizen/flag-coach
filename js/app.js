@@ -61,7 +61,9 @@ function route() {
   // The call sheet is reached from the playbook and belongs to it in the tab bar.
   renderTabs(inEditor || name === 'callsheet' ? 'playbook' : VIEWS[name] ? name : 'home');
   try {
-    current = inEditor ? Editor.mount(viewEl, arg) : (VIEWS[name] || Home).mount(viewEl);
+    // The second segment is the play id in the editor and the formation in the
+    // playbook; every other view ignores it.
+    current = inEditor ? Editor.mount(viewEl, arg) : (VIEWS[name] || Home).mount(viewEl, arg);
   } catch (e) {
     console.error(e);
     viewEl.replaceChildren(h('div', { class: 'page empty-state' }, h('h2', null, 'Something went wrong'), h('p', null, String(e.message || e))));

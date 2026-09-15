@@ -38,6 +38,13 @@ pick a starting formation anyway. The search box jumps straight to matching
 plays across every formation, and **All N plays** beside it is the
 everything-at-once list.
 
+Which formation is open is part of the address (`#/playbook/Trips%20Right`), so
+tapping the **Playbook** tab from inside a formation takes you back to the
+formations, the iPad's back gesture works, and the page survives a reload.
+Coming back from a play lands you on the formation you opened it from — unless
+that formation has emptied out since, which sends you to the formations rather
+than an empty grid.
+
 Inside a formation the plays are split into labelled **Pass plays** and **Run
 plays** blocks, each card tagged PASS or RUN, and the **All / Pass / Run**
 filter carries the count of each (picking one collapses to a single grid). A
