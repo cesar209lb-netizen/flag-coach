@@ -185,10 +185,33 @@ the app's greens comes out of a printer as a page of solid ink.
 
 ## Game day
 
-The **Game** tab keeps score and records what you called. Pick a play from the
-numbered list, tap Touchdown, Gain, No gain, Loss or Turnover, and that is the
-snap logged. Down and distance keep themselves — the chains move, downs
-advance, four and out starts a new series — and **Undo last** fixes a wrong tap.
+The **Game** tab keeps score and records what you called, built for a coach
+holding a tablet with eight seconds to the next snap.
+
+**Calling a play** is formation first and then the play, drawn — the same order
+the playbook is in, so what you want is where you already know it is. Plays you
+have already called this game sit at the top as **Called already**, because a
+second helping should be one tap. Search jumps past both.
+
+**Once it is called** you get the diagram, the down, and **Show team** — the
+same full-screen Huddle mode with its animation, Watch picker and Flip. **Ball
+to** is filled in from the play itself (whoever the throw is aimed at, or
+whoever takes the last handoff), so a play that goes as drawn needs no tap at
+all; tap a different spot when it does not. Then Touchdown, Gain, No gain, Loss
+or Turnover and the snap is logged. Down and distance keep themselves — the
+chains move, downs advance, four and out starts a new series — and **Undo last**
+fixes a wrong tap.
+
+**Who is on the field** is the strip of faces above the play caller. Tap it to
+sub: the sheet lists the roster **fewest snaps first**, so the next kid up is at
+the top, and it tells you how many are out there. Every snap you log records its
+own copy of the lineup, so substituting mid-drive does not rewrite who played
+the plays before it.
+
+**Playing time** is the other tab under the summary: snaps and share of the
+game per player, fewest first, with whoever is currently on the field outlined.
+Snaps are the unit a flag game actually has — nobody is timing a stopwatch on
+the sideline.
 
 Those results come back to the playbook: a play carries its real average and
 touchdown count next to its rating, so you can see whether the thing that works

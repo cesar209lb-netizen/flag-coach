@@ -827,6 +827,65 @@ textarea.input { resize: vertical; line-height: 1.45; }
   border: 1px solid var(--line); border-radius: 10px; }
 .gd-log-dd { color: var(--muted); font-size: 12px; font-weight: 700; min-width: 62px; }
 .gd-log-res { font-family: var(--round); font-weight: 800; padding: 2px 8px; border-radius: 8px; }
+/* Who is on the field: a tap-target strip of faces above the play caller. */
+.gd-lineup { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 10px 12px; margin-bottom: 12px; min-height: 60px; }
+.gd-lineup.empty { border-style: dashed; color: var(--muted); }
+.gd-lineup-label { font-weight: 700; font-size: 14px; white-space: nowrap; }
+.gd-lineup .chev { color: var(--muted); }
+.gd-avs { display: flex; gap: 10px; flex-wrap: wrap; }
+.gd-av-wrap { position: relative; display: inline-flex; }
+.gd-av { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none;
+  background: var(--card2); display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.gd-av.big { width: 46px; height: 46px; font-size: 17px; }
+.gd-av-num { position: absolute; right: -3px; bottom: -3px; background: var(--accent); color: #fff;
+  border-radius: 999px; font-size: 10px; font-weight: 800; padding: 1px 5px; }
+.gd-next { white-space: nowrap; }
+
+.gd-subcount { margin: 4px 0 10px; }
+.gd-subcount .ok { color: #86efac; }
+.gd-subcount .warn { color: var(--warn); }
+.gd-sublist { display: flex; flex-direction: column; gap: 6px; }
+.gd-sub { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 12px;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--card); min-height: 62px; }
+.gd-sub.on { border-color: var(--accent); background: rgba(255, 107, 26, .1); }
+.gd-sub-name { font-weight: 750; font-size: 16px; }
+.gd-sub-mark { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--line); color: var(--muted); flex: none; }
+.gd-sub-mark.on { background: var(--accent); border-color: transparent; color: #fff; }
+
+/* Calling a play: formations, then the plays, drawn — the playbook's order. */
+.gd-call { margin-top: 4px; }
+.gd-playgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.gd-playcard { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); text-align: left; }
+.gd-playcard:active { border-color: var(--accent); opacity: .9; }
+.gd-playcard-body { padding: 9px 11px 11px; }
+.gd-playcard-name { font-weight: 750; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The called play, waiting on what it did. */
+.gd-called { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.gd-called-thumb { width: 92px; aspect-ratio: 31 / 24; border-radius: 10px; overflow: hidden; background: #1a5424; flex: none; }
+.gd-called-thumb svg { display: block; width: 100%; height: 100%; }
+.gd-called-main { flex: 1 1 120px; min-width: 0; }
+.gd-called-name { font-size: 20px; font-weight: 800; line-height: 1.15; }
+.gd-called-acts { display: flex; gap: 8px; margin-left: auto; }
+.gd-to { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.gd-to-label { color: var(--muted); font-size: 13px; font-weight: 650; }
+.gd-to-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Playing time, in the only unit a flag game has. */
+.gd-tabs { margin: 14px 0 10px; }
+.gd-time { display: flex; flex-direction: column; gap: 6px; }
+.gd-time-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 12px; }
+.gd-time-row.on { border-color: rgba(255, 107, 26, .5); }
+.gd-time-name { font-weight: 700; margin-bottom: 5px; }
+.gd-bar { height: 6px; border-radius: 999px; background: var(--bg2); overflow: hidden; }
+.gd-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.gd-time-num { font-family: var(--round); font-weight: 850; font-size: 19px; text-align: right; min-width: 52px; }
+.gd-time-num small { display: block; color: var(--muted); font-size: 11px; font-weight: 700; }
+
 .gd-picklist { display: flex; flex-direction: column; gap: 6px; }
 .gd-pick { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
   padding: 10px 12px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); }
@@ -835,6 +894,41 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .gd-pick .ic { width: 18px; height: 18px; color: var(--muted); }
 .gd-game-row { text-align: left; }
 .play-real { color: #86efac; font-size: 12px; font-weight: 700; margin-top: 2px; }
+
+/* Game day on a phone: every row gives up what it can so the result buttons are
+   on screen the moment a play is called. Has to sit after the rules above — the
+   responsive section higher up in this file would lose to them. */
+@media (max-width: 720px) {
+  .gd-board { padding: 10px; gap: 6px; margin-bottom: 10px; }
+  .gd-score { font-size: 34px; }
+  .gd-score-label { font-size: 11px; }
+  .gd-board .btn.small { min-height: 30px; padding: 0 7px; font-size: 13px; }
+  .gd-down { font-size: 20px; }
+  .gd-dd-main { padding: 4px 10px; }
+  .gd-lineup { gap: 8px; padding: 8px 10px; min-height: 52px; margin-bottom: 10px; }
+  .gd-lineup-label { font-size: 13px; }
+  /* Faces scroll sideways rather than wrapping the bar into a block. */
+  .gd-avs { flex-wrap: nowrap; overflow-x: auto; gap: 9px; }
+  .gd-av { width: 30px; height: 30px; font-size: 12px; }
+  .gd-next { display: none; }
+  .gd-result { padding: 10px; }
+  .gd-called { gap: 10px; margin-bottom: 10px; }
+  .gd-called-thumb { width: 68px; }
+  .gd-called-name { font-size: 17px; }
+  .gd-called-acts { flex: 1 1 100%; margin-left: 0; }
+  .gd-called-acts .btn { flex: 1; }
+  .gd-to { margin-bottom: 8px; }
+  .gd-yards { margin-bottom: 8px; }
+  .gd-yards .icon-btn.big { width: 44px; height: 44px; }
+  .btn.big, .gd-buttons .btn { min-height: 46px; font-size: 15px; }
+  .gd-buttons { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .gd-summary { gap: 6px; }
+  .gd-summary > div { padding: 7px 4px; }
+  .gd-summary b { font-size: 19px; }
+  .gd-tabs { margin: 10px 0 8px; }
+  .gd-playgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .gd-playcard-name { font-size: 14px; }
+}
 
 /* ---------- Defensive playbook ---------- */
 .book-toggle { margin: 0 0 14px; }

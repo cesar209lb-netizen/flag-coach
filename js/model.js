@@ -83,6 +83,9 @@ export const newSeason = (name) => ({ id: uid(), name, createdAt: Date.now(), ro
 export const newGame = (seasonId, opponent = '') => ({
   id: uid(), seasonId, opponent, date: Date.now(),
   us: 0, them: 0, down: 1, toGo: 10, log: [],
+  // Who is on the field right now. Every snap records its own copy, so
+  // substituting mid-drive does not rewrite who played the earlier plays.
+  onField: [],
   createdAt: Date.now(), updatedAt: Date.now(),
 });
 
@@ -110,6 +113,22 @@ export function playStats(games, playId) {
   return calls
     ? { calls, yards, tds, turnovers, avg: Math.round((yards / calls) * 10) / 10, workRate: Math.round((worked / calls) * 100) }
     : null;
+}
+
+// Playing time, counted in snaps — the unit a flag game actually has. Rows come
+// back fewest first, which is the order a coach subs from.
+export function snapRows(game, roster) {
+  const log = game?.log || [];
+  const counts = new Map();
+  for (const e of log) for (const id of e.onField || []) counts.set(id, (counts.get(id) || 0) + 1);
+  const total = log.filter((e) => (e.onField || []).length).length;
+  return {
+    total,
+    rows: roster.map(({ player, entry }) => {
+      const snaps = counts.get(player.id) || 0;
+      return { player, entry, snaps, pct: total ? Math.round((snaps / total) * 100) : 0 };
+    }).sort((a, b) => a.snaps - b.snaps || a.player.first.localeCompare(b.player.first)),
+  };
 }
 
 // Deliberately minimal: a first name, a photo, and the jersey number on the
@@ -368,6 +387,33 @@ export function matchFormation(play, W, tol = 1.6) {
   return best ? best.name : null;
 }
 
+// Plays grouped by the formation they file under, biggest group first, ties in
+// the model's order with a mirrored variant right after what it mirrors and
+// anything custom last. The playbook picker and game day's play caller both
+// read from this, so a formation means the same thing in both.
+export function formationGroups(plays) {
+  const byName = new Map();
+  for (const p of plays) {
+    const k = formationKey(p);
+    if (!byName.has(k)) byName.set(k, []);
+    byName.get(k).push(p);
+  }
+  const out = [];
+  const take = (name) => {
+    const list = byName.get(name);
+    if (!list) return;
+    byName.delete(name);
+    out.push({ name, plays: list, ...passRunCount(list), ...formationInfo(name) });
+  };
+  for (const f of FORMATIONS) {
+    take(f.name);
+    const mirrored = [...byName.keys()].find((n) => formationInfo(n).id === f.id);
+    if (mirrored) take(mirrored);
+  }
+  for (const name of [...byName.keys()].sort()) take(name);
+  return out.map((g, i) => ({ ...g, order: i })).sort((a, b) => b.total - a.total || a.order - b.order);
+}
+
 // A play is a pass if the quarterback ever throws it. Everything else — a
 // handoff, a pitch, a sweep — is a run, even when it starts out looking like a
 // pass. A flea flicker ends in a throw, so it counts as a pass.
@@ -397,6 +443,18 @@ export function passTarget(play) {
   if (pass.to) return pass.to;
   return autoPassTarget(play);
 }
+// Whoever the ball finishes with if the play goes as drawn: the last handoff or
+// pitch, or the receiver the throw is aimed at. The game-day default for "who
+// got it", so a play that works only needs one tap.
+export function ballEndsWith(play) {
+  const ball = play.ball || [];
+  for (let i = ball.length - 1; i >= 0; i--) {
+    if (ball[i].to) return ball[i].to;
+    if (ball[i].type === 'pass') return autoPassTarget(play);
+  }
+  return 'QB';
+}
+
 export function autoPassTarget(play) {
   const byRead = play.players.filter((p) => p.read && p.slot !== 'QB').sort((a, b) => a.read - b.read)[0];
   if (byRead) return byRead.slot;
