@@ -807,7 +807,12 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .gd-dd { text-align: center; }
 .gd-dd-main { display: flex; flex-direction: column; gap: 2px; padding: 6px 14px; border-radius: 12px; background: var(--bg2); }
 .gd-down { font-size: 26px; font-weight: 850; }
-.gd-togo { color: var(--muted); font-weight: 700; }
+.gd-togo { font-weight: 750; font-size: 13px; }
+.gd-togo.mid { color: var(--warn); }
+.gd-togo.score { color: #86efac; }
+.gd-log-first { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 7px;
+  background: rgba(34, 197, 94, .18); color: #86efac; }
+.gd-cross { grid-column: 1 / -1; }
 .gd-callrow { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
 .btn.big, .gd-buttons .btn { min-height: 54px; font-size: 16px; font-weight: 750; }
 .gd-result { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
@@ -825,7 +830,7 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .gd-log { display: flex; flex-direction: column; gap: 4px; }
 .gd-log-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--card);
   border: 1px solid var(--line); border-radius: 10px; }
-.gd-log-dd { color: var(--muted); font-size: 12px; font-weight: 700; min-width: 62px; }
+.gd-log-dd { color: var(--muted); font-size: 12px; font-weight: 700; min-width: 78px; }
 .gd-log-res { font-family: var(--round); font-weight: 800; padding: 2px 8px; border-radius: 8px; }
 /* Who is on the field: a tap-target strip of faces above the play caller. */
 .gd-lineup { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
@@ -843,17 +848,33 @@ textarea.input { resize: vertical; line-height: 1.45; }
   border-radius: 999px; font-size: 10px; font-weight: 800; padding: 1px 5px; }
 .gd-next { white-space: nowrap; }
 
-.gd-subcount { margin: 4px 0 10px; }
-.gd-subcount .ok { color: #86efac; }
-.gd-subcount .warn { color: var(--warn); }
-.gd-sublist { display: flex; flex-direction: column; gap: 6px; }
-.gd-sub { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 12px;
-  border-radius: 14px; border: 1px solid var(--line); background: var(--card); min-height: 62px; }
-.gd-sub.on { border-color: var(--accent); background: rgba(255, 107, 26, .1); }
-.gd-sub-name { font-weight: 750; font-size: 16px; }
-.gd-sub-mark { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-  border: 1px solid var(--line); color: var(--muted); flex: none; }
-.gd-sub-mark.on { background: var(--accent); border-color: transparent; color: #fff; }
+/* An empty slot on the bar reads as loudly as a filled one. */
+.gd-av.gap { border: 2px dashed var(--line2); background: transparent; }
+.gd-lineup.short { border-color: rgba(250, 204, 21, .45); }
+
+/* Picking the five: faces big enough to tap without looking, with how much
+   each has played underneath. */
+.gd-fieldcount { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 2px 0 10px;
+  padding: 10px 12px; border-radius: 12px; background: rgba(250, 204, 21, .1);
+  border: 1px solid rgba(250, 204, 21, .35); }
+.gd-fieldcount.ok { background: rgba(34, 197, 94, .1); border-color: rgba(34, 197, 94, .35); }
+.gd-fieldcount b { font-size: 16px; }
+.gd-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 10px; }
+.gd-card { border: 2px solid var(--line); border-radius: 16px; background: var(--card); padding: 8px; text-align: center; }
+.gd-card.on { border-color: var(--accent); background: rgba(255, 107, 26, .12); }
+.gd-card.full { opacity: .45; }
+.gd-card-photo { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+  background: var(--card2); display: grid; place-items: center; margin-bottom: 7px; }
+.gd-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gd-card-initials { font-family: var(--round); font-size: 30px; font-weight: 850; color: var(--muted); }
+.gd-card-num { position: absolute; left: 5px; top: 5px; background: rgba(6, 12, 18, .78); color: #fff;
+  border-radius: 8px; font-size: 11px; font-weight: 800; padding: 2px 6px; }
+.gd-card-tick { position: absolute; right: 5px; bottom: 5px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: #fff; display: grid; place-items: center; }
+.gd-card-tick .ic { width: 16px; height: 16px; }
+.gd-card-name { font-weight: 750; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gd-card-time { color: var(--muted); font-size: 11px; font-weight: 650; }
+.gd-card-time .gd-bar { margin-top: 4px; }
 
 /* Calling a play: formations, then the plays, drawn — the playbook's order. */
 .gd-call { margin-top: 4px; }
@@ -922,6 +943,14 @@ textarea.input { resize: vertical; line-height: 1.45; }
   .gd-yards .icon-btn.big { width: 44px; height: 44px; }
   .btn.big, .gd-buttons .btn { min-height: 46px; font-size: 15px; }
   .gd-buttons { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  /* Crossing shares a row with the touchdown here rather than taking one of
+     its own — a whole row is the difference between reaching the buttons and
+     scrolling for them. */
+  .gd-cross { grid-column: auto; font-size: 14px; padding: 0 8px; }
+  /* Three faces across rather than two, so a squad fits without scrolling. */
+  .gd-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .gd-card { padding: 6px; border-radius: 13px; }
+  .gd-card-name { font-size: 13px; }
   .gd-summary { gap: 6px; }
   .gd-summary > div { padding: 7px 4px; }
   .gd-summary b { font-size: 19px; }

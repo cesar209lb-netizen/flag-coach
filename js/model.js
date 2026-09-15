@@ -80,14 +80,35 @@ export const newSeason = (name) => ({ id: uid(), name, createdAt: Date.now(), ro
 // A game logged from the sideline. `log` is every play called, in order, with
 // what it actually did — which is the only way the app ever learns whether a
 // play works against real people rather than the simulation.
+// Flag football has no chains. A series is four downs to cross midfield, and
+// crossing buys four more to score — so the only first down there is is the one
+// you get by crossing. `phase` is which half of that you are in.
+export const PHASES = { mid: 'to midfield', score: 'to score' };
+export const phaseOf = (game) => (game?.phase === 'score' ? 'score' : 'mid');
+// Five on the field, always. It is the whole game.
+export const ON_FIELD = 5;
+
 export const newGame = (seasonId, opponent = '') => ({
   id: uid(), seasonId, opponent, date: Date.now(),
-  us: 0, them: 0, down: 1, toGo: 10, log: [],
+  us: 0, them: 0, down: 1, phase: 'mid', log: [],
   // Who is on the field right now. Every snap records its own copy, so
   // substituting mid-drive does not rewrite who played the earlier plays.
   onField: [],
   createdAt: Date.now(), updatedAt: Date.now(),
 });
+
+// Where the next snap stands after this one. `crossed` is the coach saying the
+// play carried the ball over midfield, which is the first down.
+export function nextDown(game, result, crossed) {
+  const phase = phaseOf(game);
+  // A score or a giveaway ends the possession; you get the ball back needing
+  // midfield again, same as the start of any series.
+  if (result === 'td' || result === 'turnover') return { down: 1, phase: 'mid' };
+  if (crossed && phase === 'mid') return { down: 1, phase: 'score' };
+  // Four and out, whichever half of the series you were in.
+  if (game.down >= 4) return { down: 1, phase: 'mid' };
+  return { down: game.down + 1, phase };
+}
 
 // What a logged play did. Yards are the yards gained on that snap.
 export const PLAY_RESULTS = [

@@ -198,15 +198,25 @@ same full-screen Huddle mode with its animation, Watch picker and Flip. **Ball
 to** is filled in from the play itself (whoever the throw is aimed at, or
 whoever takes the last handoff), so a play that goes as drawn needs no tap at
 all; tap a different spot when it does not. Then Touchdown, Gain, No gain, Loss
-or Turnover and the snap is logged. Down and distance keep themselves — the
-chains move, downs advance, four and out starts a new series — and **Undo last**
-fixes a wrong tap.
+or Turnover and the snap is logged. **Undo last** fixes a wrong tap.
 
-**Who is on the field** is the strip of faces above the play caller. Tap it to
-sub: the sheet lists the roster **fewest snaps first**, so the next kid up is at
-the top, and it tells you how many are out there. Every snap you log records its
-own copy of the lineup, so substituting mid-drive does not rewrite who played
-the plays before it.
+**Downs are flag downs.** There are no chains: four plays to cross midfield,
+and crossing buys four more to score. So the board reads `1st down · to
+midfield` and then `1st down · to score`, and the one first down a series has
+is its own button — **Crossed midfield** — because the app has no way to know
+where the ball is and a coach on a sideline is not counting yards to a stake.
+Four and out, a score or a turnover starts the next series back at midfield.
+Tap the down block to correct any of it.
+
+**Who is on the field** is the strip of faces above the play caller — five
+slots, with the empty ones drawn, because five is the whole game. Tap it and
+the picker opens: everyone's photo big enough to tap without looking, with
+their snaps and a bar underneath, split into who is out there and who is
+waiting. The bench is ordered **least playing time first**, so the kid who is
+owed a turn is the first one you see. Tapping moves a player between the two,
+and it will not let you leave with anything other than five. Every snap you log
+records its own copy of the lineup, so substituting mid-drive does not rewrite
+who played the plays before it.
 
 **Playing time** is the other tab under the summary: snaps and share of the
 game per player, fewest first, with whoever is currently on the field outlined.

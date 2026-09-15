@@ -14,8 +14,8 @@
 import { h, icon, iconBtn, btn, segmented, openSheet, confirmDialog, promptDialog, toast, initials } from '../ui.js';
 import { state, subscribe, activeSeason, saveGame, deleteGame, gameById, playById, rosterFor } from '../store.js';
 import {
-  newGame, PLAY_RESULTS, playStats, uid, formationGroups, formationSample,
-  isPassPlay, ballEndsWith, snapRows,
+  newGame, PLAY_RESULTS, PHASES, ON_FIELD, phaseOf, nextDown, playStats, uid,
+  formationGroups, formationSample, isPassPlay, ballEndsWith, snapRows,
 } from '../model.js';
 import { playThumb } from '../field.js';
 import { openHuddle } from './huddle.js';
@@ -79,7 +79,7 @@ async function renameGame(game) {
 
 // ---------- Recording ----------
 
-async function record(game, result, yards) {
+async function record(game, result, yards, crossed = false) {
   const play = pending?.id ? playById(pending.id) : null;
   const entry = {
     id: uid(), playId: pending?.id || null, playName: pending?.name || 'Play',
@@ -88,22 +88,11 @@ async function record(game, result, yards) {
     to: pending?.to || null,
     toName: pending?.to ? carrierLabel(play, pending.to) : null,
     onField: [...(game.onField || [])],
-    down: game.down, toGo: game.toGo, result, yards, at: Date.now(),
+    down: game.down, phase: phaseOf(game), crossed: crossed || undefined,
+    result, yards, at: Date.now(),
   };
-  const g = { ...game, log: [...(game.log || []), entry] };
-
-  if (result === 'td') {
-    g.us += 6;
-    g.down = 1; g.toGo = 10;
-  } else if (result === 'turnover') {
-    g.down = 1; g.toGo = 10;
-  } else {
-    const net = result === 'loss' ? -Math.abs(yards) : yards;
-    const toGo = g.toGo - net;
-    if (toGo <= 0) { g.down = 1; g.toGo = 10; } // moved the chains
-    else if (g.down >= 4) { g.down = 1; g.toGo = 10; } // turnover on downs
-    else { g.down += 1; g.toGo = toGo; }
-  }
+  const g = { ...game, log: [...(game.log || []), entry], ...nextDown(game, result, crossed) };
+  if (result === 'td') g.us += 6;
   pending = null;
   await saveGame(g);
   rerender();
@@ -113,7 +102,9 @@ async function undoLast(game) {
   const log = game.log || [];
   if (!log.length) return;
   const last = log[log.length - 1];
-  const g = { ...game, log: log.slice(0, -1), down: last.down, toGo: last.toGo };
+  // Put the down back exactly as it was when that play was called.
+  const g = { ...game, log: log.slice(0, -1), down: last.down, phase: last.phase || phaseOf(game) };
+  if (last.toGo != null) g.toGo = last.toGo;
   if (last.result === 'td') g.us = Math.max(0, g.us - 6);
   await saveGame(g);
   toast('Last play removed');
@@ -140,61 +131,95 @@ function lineupBar(game) {
   const { rows } = snapRows(game, roster);
   const bench = rows.filter((r) => !(game.onField || []).includes(r.player.id));
   const next = bench.slice(0, 2).map((r) => r.player.first).join(', ');
-  return h('button', { class: `gd-lineup ${on.length ? '' : 'empty'}`, onclick: () => lineupSheet(game) },
-    h('span', { class: 'gd-lineup-label' }, on.length ? `${on.length} on the field` : 'Pick who is on the field'),
-    h('span', { class: 'gd-avs' }, ...on.map(({ player, entry }) =>
-      h('span', { class: 'gd-av-wrap', title: player.first },
-        avatarOf(player),
-        entry.number ? h('span', { class: 'gd-av-num' }, entry.number) : null))),
+  // Five slots, always, with the gaps drawn — a missing kid should be as
+  // obvious as a present one.
+  const slots = [];
+  for (let i = 0; i < ON_FIELD; i++) {
+    const r = on[i];
+    slots.push(r
+      ? h('span', { class: 'gd-av-wrap', title: r.player.first },
+        avatarOf(r.player),
+        r.entry.number ? h('span', { class: 'gd-av-num' }, r.entry.number) : null)
+      : h('span', { class: 'gd-av-wrap' }, h('span', { class: 'gd-av gap' })));
+  }
+  const short = on.length < ON_FIELD;
+  return h('button', { class: `gd-lineup ${short ? 'short' : ''}`, onclick: () => lineupSheet(game) },
+    h('span', { class: 'gd-lineup-label' }, short ? `${on.length} of ${ON_FIELD} — tap to fill` : 'On the field'),
+    h('span', { class: 'gd-avs' }, ...slots),
     h('div', { class: 'spacer' }),
     next ? h('span', { class: 'gd-next muted small' }, `Up next: ${next}`) : null,
     icon('next', 'chev'));
 }
 
+// Picking the five. Two zones with the pictures big enough to tap without
+// looking: who is out there, and who is waiting with how much they have played.
+// Tapping moves a kid between them, which is the whole interaction.
 function lineupSheet(game) {
   const roster = rosterFor();
-  const list = h('div', { class: 'gd-sublist' });
+  const body = h('div');
   let picked = [...(game.onField || [])];
-  const countEl = h('div', { class: 'gd-subcount' });
+  let doneBtn = null;
+
+  const card = (row, on) => {
+    const { player, entry, snaps, pct } = row;
+    const full = !on && picked.length >= ON_FIELD;
+    return h('button', {
+      class: `gd-card ${on ? 'on' : ''} ${full ? 'full' : ''}`,
+      onclick: () => {
+        if (full) { toast(`Five on the field — take someone off first`); return; }
+        picked = on ? picked.filter((id) => id !== player.id) : [...picked, player.id];
+        draw();
+      },
+    },
+    h('div', { class: 'gd-card-photo' },
+      player.photo ? h('img', { src: player.photo, alt: '' }) : h('span', { class: 'gd-card-initials' }, initials(player)),
+      entry.number ? h('span', { class: 'gd-card-num' }, `#${entry.number}`) : null,
+      on ? h('span', { class: 'gd-card-tick' }, icon('check')) : null),
+    h('div', { class: 'gd-card-name' }, player.first),
+    h('div', { class: 'gd-card-time' },
+      h('span', null, `${snaps} snap${snaps === 1 ? '' : 's'}`),
+      h('div', { class: 'gd-bar' }, h('i', { style: { width: `${pct}%` } }))));
+  };
 
   const draw = () => {
-    // Fewest snaps first, so the next kid to put in is the one at the top.
+    // Fewest snaps first on the bench, so the kid who is owed a turn is first.
     const { rows, total } = snapRows(game, roster);
-    countEl.replaceChildren(
-      h('b', { class: picked.length === 5 ? 'ok' : 'warn' }, `${picked.length} on the field`),
-      h('span', { class: 'muted small' }, total ? ` · ${total} snaps logged this game` : ' · nothing logged yet'));
-    list.replaceChildren(...rows.map(({ player, entry, snaps, pct }) => {
-      const on = picked.includes(player.id);
-      return h('button', {
-        class: `gd-sub ${on ? 'on' : ''}`,
-        onclick: () => {
-          picked = on ? picked.filter((id) => id !== player.id) : [...picked, player.id];
-          draw();
-        },
-      },
-      avatarOf(player, 'big'),
-      h('span', { class: 'grow' },
-        h('div', { class: 'gd-sub-name' }, player.first, entry.number ? h('span', { class: 'muted' }, ` #${entry.number}`) : null),
-        h('div', { class: 'muted small' }, `${snaps} snap${snaps === 1 ? '' : 's'}${pct ? ` · ${pct}%` : ''}`)),
-      h('span', { class: `gd-sub-mark ${on ? 'on' : ''}` }, on ? icon('check') : icon('plus')));
-    }));
+    const on = rows.filter((r) => picked.includes(r.player.id));
+    const off = rows.filter((r) => !picked.includes(r.player.id));
+    if (doneBtn) doneBtn.disabled = picked.length !== ON_FIELD;
+    body.replaceChildren(
+      h('div', { class: `gd-fieldcount ${picked.length === ON_FIELD ? 'ok' : ''}` },
+        h('b', null, `${picked.length} of ${ON_FIELD} on the field`),
+        h('span', { class: 'muted small' }, total ? `${total} snaps logged so far` : 'nothing logged yet')),
+      h('div', { class: 'section-label' }, 'On the field'),
+      on.length
+        ? h('div', { class: 'gd-cards' }, ...on.map((r) => card(r, true)))
+        : h('p', { class: 'p-help' }, 'Nobody yet — tap five from the bench.'),
+      h('div', { class: 'section-label' }, picked.length >= ON_FIELD ? 'Bench — take someone off to swap' : 'Bench — least playing time first'),
+      off.length
+        ? h('div', { class: 'gd-cards' }, ...off.map((r) => card(r, false)))
+        : h('p', { class: 'p-help' }, 'Everybody is in.'));
   };
   draw();
 
-  openSheet({
+  const sheet = openSheet({
     title: 'On the field',
-    size: 'md',
-    body: h('div', null,
-      h('p', { class: 'p-help' }, 'Tap to put someone in or take them out. Fewest snaps first, so the next one up is at the top. Every play you log records who was out there.'),
-      countEl, list),
+    size: 'lg',
+    body,
     actions: [
       { label: 'Cancel', kind: 'ghost' },
       {
         label: 'Done', kind: 'primary',
-        onClick: async () => { await saveGame({ ...game, onField: picked }); rerender(); },
+        onClick: async () => {
+          if (picked.length !== ON_FIELD) return false;
+          await saveGame({ ...game, onField: picked });
+          rerender();
+        },
       },
     ],
   });
+  doneBtn = sheet.panel.querySelector('.sheet-foot .btn.primary');
+  if (doneBtn) doneBtn.disabled = picked.length !== ON_FIELD;
 }
 
 // ---------- Calling a play ----------
@@ -279,7 +304,7 @@ function callSheet(game) {
   draw();
 
   const sheet = openSheet({
-    title: `Call a play · ${ordinal(game.down)} & ${game.toGo}`,
+    title: `Call a play · ${ordinal(game.down)} ${PHASES[phaseOf(game)]}`,
     size: 'lg',
     body: h('div', null,
       h('div', { class: 'search-wrap pad' }, icon('search'), search),
@@ -304,7 +329,7 @@ function pendingCard(game) {
       play ? h('div', { class: 'gd-called-thumb', html: playThumb(play, W) }) : null,
       h('div', { class: 'gd-called-main' },
         h('div', { class: 'gd-called-name' }, pending.name),
-        h('div', { class: 'muted small' }, [play?.formation, `${ordinal(game.down)} & ${game.toGo}`].filter(Boolean).join(' · '))),
+        h('div', { class: 'muted small' }, [play?.formation, `${ordinal(game.down)} ${PHASES[phaseOf(game)]}`].filter(Boolean).join(' · '))),
       // Kept together so they wrap as one block rather than one at a time.
       h('div', { class: 'gd-called-acts' },
         play ? btn('Show team', () => openHuddle([play.id], 0), { iconName: 'expand', kind: 'ghost' }) : null,
@@ -318,10 +343,18 @@ function pendingCard(game) {
       }, carrierLabel(play, slot))))) : null,
 
     yardRow,
-    h('div', { class: 'gd-buttons' }, ...PLAY_RESULTS.map((r) => btn(
-      r.id === 'gain' ? `Gain ${gainYards}` : r.id === 'loss' ? `Loss ${gainYards}` : r.label,
-      () => record(game, r.id, r.id === 'gain' || r.id === 'loss' ? gainYards : 0),
-      { kind: `big tone-${r.tone}` }))));
+    // The first down of a flag series is crossing midfield, so it is a button of
+    // its own rather than something the app infers from a yard count nobody on
+    // a sideline actually has. It sits with the touchdown: the two good ones.
+    h('div', { class: 'gd-buttons' }, ...PLAY_RESULTS.flatMap((r) => {
+      const one = btn(
+        r.id === 'gain' ? `Gain ${gainYards}` : r.id === 'loss' ? `Loss ${gainYards}` : r.label,
+        () => record(game, r.id, r.id === 'gain' || r.id === 'loss' ? gainYards : 0),
+        { kind: `big tone-${r.tone}` });
+      if (r.id !== 'td' || phaseOf(game) !== 'mid') return [one];
+      return [one, btn(`Crossed midfield +${gainYards}`, () => record(game, 'gain', gainYards, true),
+        { kind: 'big tone-great gd-cross' })];
+    })));
 }
 
 // ---------- Screen ----------
@@ -345,18 +378,36 @@ function scoreboard(game) {
   return h('section', { class: 'gd-board' },
     col('us', state.settings.teamName || 'Us'),
     h('div', { class: 'gd-dd' },
-      h('button', {
-        class: 'gd-dd-main',
-        onclick: async () => {
-          const v = await promptDialog({ title: 'Down & distance', label: 'Yards to go', value: String(game.toGo), confirmText: 'Set' });
-          if (v === null) return;
-          const n = parseInt(v, 10);
-          if (Number.isFinite(n)) { await saveGame({ ...game, toGo: Math.max(1, n) }); rerender(); }
-        },
-      }, h('span', { class: 'gd-down' }, ordinal(game.down)), h('span', { class: 'gd-togo' }, `& ${game.toGo}`)),
+      h('button', { class: 'gd-dd-main', onclick: () => downSheet(game) },
+        h('span', { class: 'gd-down' }, `${ordinal(game.down)} down`),
+        h('span', { class: `gd-togo ${phaseOf(game)}` }, PHASES[phaseOf(game)])),
       h('div', { class: 'btn-row tight center' },
-        btn('New series', async () => { await saveGame({ ...game, down: 1, toGo: 10 }); rerender(); }, { kind: 'small ghost' }))),
+        btn('New series', async () => { await saveGame({ ...game, down: 1, phase: 'mid' }); rerender(); }, { kind: 'small ghost' }))),
     col('them', game.opponent || 'Them'));
+}
+
+// Fixing the down when a tap went wrong, or when the referee disagrees.
+function downSheet(game) {
+  const body = h('div');
+  let down = game.down;
+  let phase = phaseOf(game);
+  const draw = () => body.replaceChildren(
+    h('p', { class: 'p-help' }, 'Four downs to cross midfield, then four more to score. Crossing is the only first down there is.'),
+    h('div', { class: 'field-label' }, 'Down',
+      segmented([1, 2, 3, 4].map((n) => ({ value: n, label: ordinal(n) })), down, (v) => { down = v; draw(); })),
+    h('div', { class: 'field-label' }, 'Going',
+      segmented([{ value: 'mid', label: PHASES.mid }, { value: 'score', label: PHASES.score }], phase,
+        (v) => { phase = v; draw(); })));
+  draw();
+  openSheet({
+    title: 'Down',
+    size: 'sm',
+    body,
+    actions: [
+      { label: 'Cancel', kind: 'ghost' },
+      { label: 'Set', kind: 'primary', onClick: async () => { await saveGame({ ...game, down, phase }); rerender(); } },
+    ],
+  });
 }
 
 function logList(game) {
@@ -366,10 +417,14 @@ function logList(game) {
     const r = PLAY_RESULTS.find((x) => x.id === e.result);
     const gained = e.result === 'td' ? 'TD' : e.result === 'turnover' ? 'TO'
       : e.result === 'loss' ? `−${Math.abs(e.yards)}` : e.result === 'none' ? '0' : `+${e.yards}`;
+    // Games logged before flag downs carried a yards-to-go number; they keep it.
+    const dd = e.phase ? `${ordinal(e.down)} ${e.phase === 'score' ? 'to score' : 'to mid'}`
+      : `${ordinal(e.down)} & ${e.toGo}`;
     return h('div', { class: 'gd-log-row' },
-      h('span', { class: 'gd-log-dd' }, `${ordinal(e.down)} & ${e.toGo}`),
+      h('span', { class: 'gd-log-dd' }, dd),
       h('span', { class: 'grow' }, e.playName,
         e.toName ? h('span', { class: 'muted small' }, ` · to ${e.toName}`) : null),
+      e.crossed ? h('span', { class: 'gd-log-first' }, '1st') : null,
       h('span', { class: `gd-log-res tone-${r?.tone || 'neutral'}` }, gained));
   }));
 }
