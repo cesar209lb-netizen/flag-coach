@@ -26,6 +26,25 @@ Open http://localhost:8080. The dev server disables caching so edits show up on 
 4. Open it once from the Home Screen while online. After that it works with no internet.
 5. Test: turn on Airplane Mode and open the app.
 
+## Playbook
+
+The playbook opens on the **formations**, not on every play at once. Each card
+draws the alignment and says what you have out of it — `3 pass · 1 run` — so a
+formation you have three ways to attack from is obvious next to one you have
+only ever thrown from. Tap a formation for its plays; the search box jumps
+straight to matching plays across every formation, and **All plays** is still
+one tap away. Formations you have not used yet sit at the bottom, ready to
+start a play in.
+
+Inside a formation, the **All / Pass / Run** filter carries the count of each,
+and every play card is tagged PASS or RUN. A play counts as a pass if the
+quarterback throws it at any point — a flea flicker is a pass; a jet sweep,
+which only ever gets handed off, is a run.
+
+Flipping a play renames its formation with it ("Trips Right" becomes
+"Trips Left"), so a mirrored play gets its own card next to the one it mirrors
+rather than hiding inside it.
+
 ## Route lab
 
 The **Routes** tab is a standalone drill: one QB, one receiver, and a route.

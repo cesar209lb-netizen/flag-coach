@@ -65,10 +65,7 @@ export function mount(root, playId) {
     iconBtn('back', () => { location.hash = '#/playbook'; }, { title: 'Back to playbook' }),
     nameInput, saveEl, h('div', { class: 'spacer' }),
     undoBtn, redoBtn,
-    iconBtn('flip', () => commit(() => {
-      flipPlay(play, W);
-      if (preview) preview = { ...preview, look: mirrorLook(preview.look) };
-    }), { title: 'Flip left/right' }),
+    btn('Flip', flipCurrent, { iconName: 'flip', kind: 'ghost', cls: 'flip-btn', title: 'Flip the whole play left to right' }),
     btn('Huddle', () => { flush(); openHuddle([play.id], 0); }, { iconName: 'expand', kind: 'ghost', cls: 'hide-narrow' }),
     iconBtn('more', moreMenu, { title: 'More' }));
 
@@ -548,7 +545,9 @@ export function mount(root, playId) {
       section('Formation',
         h('p', { class: 'p-help' }, 'Moves players into position. Routes stay attached.'),
         h('div', { class: 'chip-grid' }, FORMATIONS.map((f) =>
-          h('button', { class: `chip-btn ${current === f.id ? 'on' : ''}`, onclick: () => commit(() => applyFormation(play, f.id, W)) }, f.name)))),
+          h('button', { class: `chip-btn ${current === f.id ? 'on' : ''}`, onclick: () => commit(() => applyFormation(play, f.id, W)) }, f.name))),
+        h('div', { class: 'btn-row' },
+          btn('Flip play left to right', flipCurrent, { iconName: 'flip', kind: 'ghost' }))),
       section(null, resultCard()));
   }
 
@@ -807,6 +806,17 @@ export function mount(root, playId) {
   }
 
   // ---------- Menu actions ----------
+  // Mirrors the whole play — players, routes, motion and the defensive look —
+  // so a play drawn to the right can be run to the left.
+  function flipCurrent() {
+    commit(() => {
+      flipPlay(play, W);
+      if (preview) preview = { ...preview, look: mirrorLook(preview.look) };
+    });
+    nameInput.value = play.name;
+    toast('Flipped left to right');
+  }
+
   async function duplicate(mirror = false) {
     flush();
     const c = copyPlay(play, mirror ? '' : ' (copy)');
