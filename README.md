@@ -56,6 +56,11 @@ thrown at the hitch — and the readout gives the depth and where it was caught.
 Out, corner and flat break toward the nearest sideline, so **Flip** or dragging
 across the field runs them the other way. Nothing here touches the playbook.
 
+From a tablet up the route list sits beside the field rather than under it, so
+all eighteen routes and the drill are on screen together with nothing to
+scroll — the field box takes the field's own proportions so it is exactly the
+drill and no wasted turf.
+
 ## Sharing a playbook with another coach (team sync)
 
 Paired devices can share one playbook. It is off by default — nothing leaves a
