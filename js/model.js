@@ -64,7 +64,7 @@ export const sameDefense = (a, b) =>
 export function defaultSettings() {
   return {
     id: 'settings', teamName: 'My Team',
-    fieldWidth: 30, passClock: 7, rushDistance: 8,
+    fieldWidth: 30, passClock: 7, rushDistance: 8, halfMinutes: 20,
     activeSeasonId: null, lastBackupAt: null, lastChangeAt: null,
     tags: [...DEFAULT_TAGS], seeded: false, createdAt: Date.now(),
   };
@@ -80,14 +80,60 @@ export const newSeason = (name) => ({ id: uid(), name, createdAt: Date.now(), ro
 // A game logged from the sideline. `log` is every play called, in order, with
 // what it actually did — which is the only way the app ever learns whether a
 // play works against real people rather than the simulation.
-export const newGame = (seasonId, opponent = '') => ({
+// Flag football has no chains. A series is four downs to cross midfield, and
+// crossing buys four more to score — so the only first down there is is the one
+// you get by crossing. `phase` is which half of that you are in.
+export const PHASES = { mid: 'to midfield', score: 'to score' };
+export const phaseOf = (game) => (game?.phase === 'score' ? 'score' : 'mid');
+// Five on the field, always. It is the whole game.
+export const ON_FIELD = 5;
+
+// A running clock that survives the app being closed: `ms` is what was left
+// when it last stopped, and `since` is when it started running. The time left
+// is always derived, never counted down in a variable that a backgrounded tab
+// would stop updating.
+export const newClock = (minutes = 20) => ({ half: 1, minutes, ms: Math.round(minutes * 60000), since: null });
+export const clockLeft = (c) => (!c ? 0 : Math.max(0, c.since ? c.ms - (Date.now() - c.since) : c.ms));
+export const clockRunning = (c) => !!c?.since && clockLeft(c) > 0;
+export function clockText(ms) {
+  const t = Math.ceil(ms / 1000);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+export const newGame = (seasonId, opponent = '', minutes = 20) => ({
   id: uid(), seasonId, opponent, date: Date.now(),
-  us: 0, them: 0, down: 1, toGo: 10, log: [],
-  // Who is on the field right now. Every snap records its own copy, so
+  us: 0, them: 0, down: 1, phase: 'mid', log: [],
+  clock: newClock(minutes),
+  // Who is playing where. Every snap records its own copy of both, so
   // substituting mid-drive does not rewrite who played the earlier plays.
-  onField: [],
+  spots: {}, onField: [],
   createdAt: Date.now(), updatedAt: Date.now(),
 });
+
+// The five on the field, in the order the positions are listed, from whichever
+// shape the game happens to carry: spots for a game that assigned positions,
+// the flat list for one recorded before positions existed.
+export function fieldSpots(game) {
+  const spots = game?.spots || {};
+  const used = SLOTS.map((slot) => ({ slot, playerId: spots[slot] || null }));
+  if (used.some((s) => s.playerId)) return used;
+  const flat = game?.onField || [];
+  return SLOTS.map((slot, i) => ({ slot, playerId: flat[i] || null }));
+}
+export const spotIds = (spots) => SLOTS.map((s) => spots[s]).filter(Boolean);
+
+// Where the next snap stands after this one. `crossed` is the coach saying the
+// play carried the ball over midfield, which is the first down.
+export function nextDown(game, result, crossed) {
+  const phase = phaseOf(game);
+  // A score or a giveaway ends the possession; you get the ball back needing
+  // midfield again, same as the start of any series.
+  if (result === 'td' || result === 'turnover') return { down: 1, phase: 'mid' };
+  if (crossed && phase === 'mid') return { down: 1, phase: 'score' };
+  // Four and out, whichever half of the series you were in.
+  if (game.down >= 4) return { down: 1, phase: 'mid' };
+  return { down: game.down + 1, phase };
+}
 
 // What a logged play did. Yards are the yards gained on that snap.
 export const PLAY_RESULTS = [

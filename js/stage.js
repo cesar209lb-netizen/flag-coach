@@ -57,8 +57,12 @@ export class PlayStage {
     this.ctx = ctx;
     this.sim = sim || simulate(play, ctx);
     this.gRoutes.innerHTML = routesMarkup(play, { faint: !this.focus, focus: this.focus, target: this.sim.target });
+    // The transparent disc is a finger-sized target: the drawn token is about a
+    // yard across, which is a small thing to hit on a moving field.
     this.gOff.innerHTML = play.players.map((p) =>
-      `<g><circle class="ring" r="${this.r + 0.75}" fill="none" stroke-width=".3" opacity="0"/>${tokenMarkup(p, ctx.tokenInfo(p.assigned), { r: this.r, showName: this.showNames })}</g>`).join('');
+      `<g data-slot="${p.slot}"><circle class="hit" r="${this.r + 1.6}" fill="transparent"/>`
+      + `<circle class="ring" r="${this.r + 0.75}" fill="none" stroke-width=".3" opacity="0"/>`
+      + `${tokenMarkup(p, ctx.tokenInfo(p.assigned), { r: this.r, showName: this.showNames })}</g>`).join('');
     this.offEls = [...this.gOff.children];
     this.ringEls = this.offEls.map((e) => e.querySelector('.ring'));
     this.applyFocus();

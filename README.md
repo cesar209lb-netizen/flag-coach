@@ -120,10 +120,11 @@ able to change anything, and without seeing the roster.
    **Join a team**, same as a coach.
 
 A player device gets the playbook and full-screen animated Huddle mode, with no
-Roster tab, no editing and no New Play. In Huddle mode the **Watch** picker
-spotlights one player's route and fades the rest, and aims the pass at them with
-the release timed for that route — so a kid sees the play with the ball coming
-to them. **Flip** shows the same play run to the other side. Both are views, not
+Roster tab, no editing and no New Play. In Huddle mode **tapping a receiver on
+the field** sends them the ball — their route lights up, the rest fade, and the
+throw is re-timed for that route, so a kid sees the play with the ball coming to
+them. The **Watch** row along the bottom does the same thing by letter. **Flip**
+shows the same play run to the other side. Both are views, not
 edits: they redraw a copy and never touch the saved play, which is why a player
 device can have them at all. Local edits on a player device are refused outright
 rather than queued, so it stays an exact mirror of the coaches' playbook.
@@ -198,15 +199,34 @@ same full-screen Huddle mode with its animation, Watch picker and Flip. **Ball
 to** is filled in from the play itself (whoever the throw is aimed at, or
 whoever takes the last handoff), so a play that goes as drawn needs no tap at
 all; tap a different spot when it does not. Then Touchdown, Gain, No gain, Loss
-or Turnover and the snap is logged. Down and distance keep themselves — the
-chains move, downs advance, four and out starts a new series — and **Undo last**
-fixes a wrong tap.
+or Turnover and the snap is logged. **Undo last** fixes a wrong tap.
 
-**Who is on the field** is the strip of faces above the play caller. Tap it to
-sub: the sheet lists the roster **fewest snaps first**, so the next kid up is at
-the top, and it tells you how many are out there. Every snap you log records its
-own copy of the lineup, so substituting mid-drive does not rewrite who played
-the plays before it.
+**Downs are flag downs.** There are no chains: four plays to cross midfield,
+and crossing buys four more to score. So the board reads `1st down · to
+midfield` and then `1st down · to score`, and the one first down a series has
+is its own button — **Crossed midfield** — because the app has no way to know
+where the ball is and a coach on a sideline is not counting yards to a stake.
+Four and out, a score or a turnover starts the next series back at midfield.
+Tap the down block to correct any of it.
+
+**The clock** sits in the middle of the board with the down. Tap ▶ to run it,
+tap the time to set the half length or start the next half. It is stored as
+"time left when it last stopped" plus "when it started running", so closing the
+app and coming back does not lose a second of it.
+
+**Who is on the field** is the strip of faces above the play caller — one slot
+per position, with the empty ones drawn, because five is the whole game. Tap it
+and the picker opens: five position cards across the top (QB, C, X, Y, Z, in the
+playbook's own colours) and the squad underneath. Tap a player to drop them into
+the spot you picked, or the first empty one; drag them onto a spot; or tap a
+spot to send that player back. The squad is ordered **least playing time
+first**, so the kid owed a turn is the one you see, and Done will not let you
+leave with anything other than five.
+
+Because the app knows who is playing X today, **Ball to** names the kid rather
+than the letter, and the log reads "to Mateo". Every snap records its own copy
+of the lineup, so substituting mid-drive does not rewrite who played the plays
+before it.
 
 **Playing time** is the other tab under the summary: snaps and share of the
 game per player, fewest first, with whoever is currently on the field outlined.
