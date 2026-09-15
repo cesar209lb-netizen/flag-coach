@@ -19,7 +19,7 @@ export const RATINGS = [
   { key: 'throwing', label: 'Throwing' },
   { key: 'iq', label: 'Football IQ' },
 ];
-export const DEFAULT_TAGS = ['Quick Pass', 'Deep Shot', 'Run', 'Red Zone', 'Short Yardage', 'Trick Play', 'Extra Point'];
+export const DEFAULT_TAGS = ['Quick Pass', 'Intermediate Pass', 'Deep Shot', 'Run', 'Red Zone', 'Short Yardage', 'Trick Play', 'Extra Point'];
 
 export const COVERAGES = [
   { id: 'none', name: 'None', desc: 'Just your routes' },

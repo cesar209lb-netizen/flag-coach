@@ -203,11 +203,10 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .fc-pill.none { background: var(--card2); color: var(--dim); }
 .formation-card.empty { opacity: .72; }
 .formation-card.empty .thumb-wrap { filter: saturate(.45); }
-.formation-card.pick.all { border-color: var(--line2); }
-.all-thumb { aspect-ratio: 31 / 24; display: grid; place-items: center; background: linear-gradient(140deg, #1d2a38, #142031); }
-.all-thumb .ic { width: 44px; height: 44px; color: var(--accent); }
 .section-label { color: var(--muted); font-weight: 700; font-size: 13px; text-transform: uppercase;
   letter-spacing: .05em; margin: 26px 0 10px; }
+.play-section:first-child .section-label { margin-top: 0; }
+.play-section + .play-section { margin-top: 4px; }
 
 /* Breadcrumb back out of a formation, above the page title. */
 .crumb-row:empty { display: none; }
@@ -701,7 +700,6 @@ textarea.input { resize: vertical; line-height: 1.45; }
   .formation-card.pick .formation-name { font-size: 15px; }
   .formation-body { padding: 8px 9px 10px; }
   .fc-pill { font-size: 11px; padding: 3px 7px; }
-  .all-thumb .ic { width: 32px; height: 32px; }
   .speed-wrap { display: none; }
 }
 

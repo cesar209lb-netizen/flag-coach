@@ -29,7 +29,7 @@ const ALL = '\\all';
 let formation = null;
 
 export function mount(root) {
-  const gridEl = h('div', { class: 'play-grid' });
+  const listEl = h('div');
   const chipsEl = h('div', { class: 'filter-chips' });
   const countEl = h('span', { class: 'count' });
   const crumbEl = h('div', { class: 'crumb-row' });
@@ -41,7 +41,7 @@ export function mount(root) {
   const toolbar = h('div', { class: 'toolbar' }, searchWrap, filterWrap);
 
   const pickEl = h('div', { class: 'formation-pick' });
-  const playsEl = h('div', null, chipsEl, gridEl);
+  const playsEl = h('div', null, chipsEl, listEl);
   // The toolbar never moves, so typing in the search box never loses focus
   // when the screen under it is swapped out.
   const offenseBody = h('div');
@@ -100,9 +100,11 @@ export function mount(root) {
 
   // ---------- Formation picker ----------
 
-  // Every formation, in the order the model lists them, with a mirrored variant
-  // ("Trips Left") right after the formation it mirrors and anything custom at
-  // the end. Each carries its plays and how they split between pass and run.
+  // Every formation with its plays and how they split between pass and run,
+  // ordered by how many plays it holds — the formation the team actually lives
+  // in lands top left, and the ones with nothing in them fall to the end. Ties
+  // keep the order the model lists formations in, with a mirrored variant
+  // ("Trips Left") right after the formation it mirrors and custom last.
   function groups() {
     const byName = new Map();
     for (const p of state.plays) {
@@ -122,7 +124,7 @@ export function mount(root) {
       if (mirrored) take(mirrored);
     }
     for (const name of [...byName.keys()].sort()) take(name);
-    return out;
+    return out.map((g, i) => ({ ...g, order: i })).sort((a, b) => b.total - a.total || a.order - b.order);
   }
 
   function formationCard(g, W) {
@@ -143,22 +145,13 @@ export function mount(root) {
 
   function renderPicker() {
     const W = state.settings.fieldWidth;
-    const all = passRunCount(state.plays);
     const list = groups();
     const used = list.filter((g) => g.total);
     const unused = list.filter((g) => !g.total);
-    const allCard = h('button', { class: 'formation-card pick all', onclick: () => openFormation(ALL) },
-      h('div', { class: 'all-thumb' }, icon('playbook')),
-      h('div', { class: 'formation-body' },
-        h('div', { class: 'formation-name' }, 'All plays'),
-        h('div', { class: 'formation-desc' }, 'Every formation at once'),
-        h('div', { class: 'formation-counts' },
-          h('span', { class: 'fc-pill pass' }, `${all.pass} pass`),
-          h('span', { class: 'fc-pill run' }, `${all.run} run`))));
 
     pickEl.replaceChildren(...[
       used.length
-        ? h('div', { class: 'formation-grid pick' }, allCard, ...used.map((g) => formationCard(g, W)))
+        ? h('div', { class: 'formation-grid pick' }, ...used.map((g) => formationCard(g, W)))
         : h('div', { class: 'empty-state' },
           h('div', { class: 'empty-icon' }, icon('playbook')),
           h('h3', null, isViewer() ? 'No plays yet' : 'Your playbook is empty'),
@@ -192,6 +185,13 @@ export function mount(root) {
   }
 
   function renderFilters() {
+    if (picking()) {
+      const n = state.plays.length;
+      filterWrap.replaceChildren(...(n
+        ? [btn(`All ${n} play${n === 1 ? '' : 's'}`, () => openFormation(ALL), { iconName: 'playbook', kind: 'ghost' })]
+        : []));
+      return;
+    }
     const c = passRunCount(scoped());
     filterWrap.replaceChildren(
       segmented([
@@ -216,7 +216,7 @@ export function mount(root) {
     const W = state.settings.fieldWidth;
     const one = inFormation();
     if (!list.length) {
-      gridEl.replaceChildren(h('div', { class: 'empty-state' },
+      listEl.replaceChildren(h('div', { class: 'empty-state' },
         h('div', { class: 'empty-icon' }, icon('playbook')),
         h('h3', null, scoped().length ? 'No plays match'
           : one ? `No plays out of ${formation} yet`
@@ -227,9 +227,19 @@ export function mount(root) {
               () => openNewPlaySheet(currentFormationId()), { kind: 'primary', iconName: 'plus' })));
       return;
     }
-    const ids = list.map((p) => p.id);
+    // Passes and runs are two different conversations in a huddle, so inside a
+    // formation they get their own labelled block rather than being mixed
+    // together. Filtering to one kind already says which it is, so that view
+    // stays a single grid.
+    const split = kindFilter === 'all';
+    const passes = split ? list.filter(isPassPlay) : [];
+    const runs = split ? list.filter((p) => !isPassPlay(p)) : [];
+    // Huddle mode walks whatever order is on screen, so the ids follow the
+    // blocks rather than the unsplit list.
+    const ordered = split ? [...passes, ...runs] : list;
+    const ids = ordered.map((p) => p.id);
     const viewer = isViewer();
-    gridEl.replaceChildren(...list.map((p, i) => {
+    const card = (p, i) => {
       const pass = isPassPlay(p);
       const info = [
         h('div', { class: 'thumb-wrap', html: playThumb(p, W) }),
@@ -255,7 +265,19 @@ export function mount(root) {
         h('div', { class: 'play-card-actions' },
           iconBtn('expand', () => openHuddle(ids, i), { title: viewer ? 'Watch' : 'Huddle mode', cls: 'small' }),
           viewer ? null : iconBtn('more', () => cardMenu(p), { title: 'More', cls: 'small' })));
-    }));
+    };
+
+    if (!split) {
+      listEl.replaceChildren(h('div', { class: 'play-grid' }, ...list.map(card)));
+      return;
+    }
+    let n = 0;
+    const block = (label, plays) => (plays.length
+      ? h('div', { class: 'play-section' },
+        h('div', { class: 'section-label' }, `${label} · ${plays.length}`),
+        h('div', { class: 'play-grid' }, ...plays.map((p) => card(p, n++))))
+      : null);
+    listEl.replaceChildren(...[block('Pass plays', passes), block('Run plays', runs)].filter(Boolean));
   }
 
   // The head reads differently on the picker (how big is the playbook) and
@@ -291,8 +313,8 @@ export function mount(root) {
     const screen = picking() ? pickEl : playsEl;
     if (offenseBody.firstElementChild !== screen) offenseBody.replaceChildren(screen);
     renderHead();
-    if (picking()) { renderPicker(); return; }
     renderFilters();
+    if (picking()) { renderPicker(); return; }
     renderChips();
     renderGrid();
   }

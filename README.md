@@ -31,15 +31,17 @@ Open http://localhost:8080. The dev server disables caching so edits show up on 
 The playbook opens on the **formations**, not on every play at once. Each card
 draws the alignment and says what you have out of it — `3 pass · 1 run` — so a
 formation you have three ways to attack from is obvious next to one you have
-only ever thrown from. Tap a formation for its plays; the search box jumps
-straight to matching plays across every formation, and **All plays** is still
-one tap away. Formations you have not used yet sit at the bottom, ready to
-start a play in.
+only ever thrown from. They are ordered by how many plays they hold, biggest
+first, so the formation the team actually lives in is top left. Formations you
+have not used yet sit at the bottom, ready to start a play in. The search box
+jumps straight to matching plays across every formation, and **All N plays**
+beside it is the everything-at-once list.
 
-Inside a formation, the **All / Pass / Run** filter carries the count of each,
-and every play card is tagged PASS or RUN. A play counts as a pass if the
-quarterback throws it at any point — a flea flicker is a pass; a jet sweep,
-which only ever gets handed off, is a run.
+Inside a formation the plays are split into labelled **Pass plays** and **Run
+plays** blocks, each card tagged PASS or RUN, and the **All / Pass / Run**
+filter carries the count of each (picking one collapses to a single grid). A
+play counts as a pass if the quarterback throws it at any point — a flea
+flicker is a pass; a jet sweep, which only ever gets handed off, is a run.
 
 Flipping a play renames its formation with it ("Trips Right" becomes
 "Trips Left"), so a mirrored play gets its own card next to the one it mirrors
