@@ -110,8 +110,10 @@ A player device gets the playbook and full-screen animated Huddle mode, with no
 Roster tab, no editing and no New Play. In Huddle mode the **Watch** picker
 spotlights one player's route and fades the rest, and aims the pass at them with
 the release timed for that route — so a kid sees the play with the ball coming
-to them. Local edits on a player device are refused outright rather than
-queued, so it stays an exact mirror of the coaches' playbook.
+to them. **Flip** shows the same play run to the other side. Both are views, not
+edits: they redraw a copy and never touch the saved play, which is why a player
+device can have them at all. Local edits on a player device are refused outright
+rather than queued, so it stays an exact mirror of the coaches' playbook.
 
 The player code is the SHA-256 of the coach's team code, and the store's row
 policy only lets it read rows of kind `play` and `settings`. So a leaked player
