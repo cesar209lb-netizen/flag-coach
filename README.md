@@ -32,10 +32,11 @@ The playbook opens on the **formations**, not on every play at once. Each card
 draws the alignment and says what you have out of it — `3 pass · 1 run` — so a
 formation you have three ways to attack from is obvious next to one you have
 only ever thrown from. They are ordered by how many plays they hold, biggest
-first, so the formation the team actually lives in is top left. Formations you
-have not used yet sit at the bottom, ready to start a play in. The search box
-jumps straight to matching plays across every formation, and **All N plays**
-beside it is the everything-at-once list.
+first, so the formation the team actually lives in is top left. Only formations
+you actually run get a card — the rest live in the New Play sheet, where you
+pick a starting formation anyway. The search box jumps straight to matching
+plays across every formation, and **All N plays** beside it is the
+everything-at-once list.
 
 Inside a formation the plays are split into labelled **Pass plays** and **Run
 plays** blocks, each card tagged PASS or RUN, and the **All / Pass / Run**
