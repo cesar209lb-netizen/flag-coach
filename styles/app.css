@@ -634,6 +634,12 @@ textarea.input { resize: vertical; line-height: 1.45; }
    the bar keeps its height and fitView does not reframe the field mid-play. */
 .huddle.running .hd-bottom { opacity: 0; }
 .huddle.running .hd-bottom button, .huddle.running .hd-bottom .seg { pointer-events: none; }
+/* Says what the field itself can do, until somebody does it. */
+.hd-tip { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 1;
+  background: rgba(6, 20, 10, .78); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  color: #e7f5ea; padding: 7px 15px; border-radius: 999px; font-size: 13px; font-weight: 650;
+  white-space: nowrap; pointer-events: none; }
+.huddle.running .hd-tip { opacity: 0; transition: opacity .25s ease; }
 .hd-title { font-size: 30px; font-weight: 850; line-height: 1.05; text-shadow: 0 2px 8px rgba(0, 0, 0, .55); }
 .hd-sub { color: #bfe0c8; font-weight: 650; text-shadow: 0 1px 6px rgba(0, 0, 0, .55); }
 .hd-counter { font-family: var(--round); font-weight: 800; color: #cfe3d4; font-size: 18px; }
@@ -812,7 +818,6 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .gd-togo.score { color: #86efac; }
 .gd-log-first { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 7px;
   background: rgba(34, 197, 94, .18); color: #86efac; }
-.gd-cross { grid-column: 1 / -1; }
 .gd-callrow { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
 .btn.big, .gd-buttons .btn { min-height: 54px; font-size: 16px; font-weight: 750; }
 .gd-result { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
@@ -851,6 +856,49 @@ textarea.input { resize: vertical; line-height: 1.45; }
 /* An empty slot on the bar reads as loudly as a filled one. */
 .gd-av.gap { border: 2px dashed var(--line2); background: transparent; }
 .gd-lineup.short { border-color: rgba(250, 204, 21, .45); }
+
+/* The game clock: the biggest thing on the screen after the score. */
+.gd-clock { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px; }
+.gd-half { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.gd-half.over { color: var(--bad); }
+.gd-clock-btn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--card2); border: 1px solid var(--line); color: var(--text); flex: none; }
+.gd-clock-btn.on { background: var(--accent); border-color: transparent; color: #fff; }
+.gd-clock-btn:disabled { opacity: .35; }
+.gd-clock-btn .ic { width: 19px; height: 19px; }
+.gd-clock-time { font-family: var(--round); font-size: 30px; font-weight: 850; letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums; padding: 0 2px; }
+.gd-clock-time.low { color: var(--warn); }
+.gd-clock-time.done { color: var(--bad); }
+
+/* Which position each face is playing, on the bar above the caller. */
+.gd-av-slot { position: absolute; left: -4px; bottom: -4px; border-radius: 999px;
+  font-size: 10px; font-weight: 850; padding: 1px 5px; border: 1px solid rgba(0, 0, 0, .35); }
+
+/* The five positions, and the squad underneath to fill them from. */
+.gd-spots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+.gd-spot { position: relative; border: 2px dashed var(--line2); border-radius: 16px; background: var(--bg2);
+  padding: 8px; text-align: center; }
+.gd-spot.on { border-style: solid; border-color: var(--accent); background: rgba(255, 107, 26, .12); }
+.gd-spot.aim { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(255, 154, 92, .3); }
+.gd-spot.over { border-style: solid; border-color: var(--accent2); background: rgba(255, 154, 92, .22); }
+.gd-spot-tag { position: absolute; left: 6px; top: 6px; z-index: 1; border-radius: 8px;
+  font-size: 11px; font-weight: 850; padding: 2px 7px; }
+.gd-spot-photo { aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--card2);
+  display: grid; place-items: center; margin-bottom: 7px; }
+.gd-spot-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gd-spot-empty { color: var(--dim); }
+.gd-spot-empty .ic { width: 26px; height: 26px; }
+/* A photo inside a button is draggable to the browser, and starting its own
+   native drag cancels the pointer — which killed the drag below before it
+   began. Nothing in a card is grabbable but the card. */
+.gd-card.bench { touch-action: none; }
+.gd-card img, .gd-spot img, .gd-card-photo, .gd-spot-photo {
+  -webkit-user-drag: none; -webkit-touch-callout: none; pointer-events: none;
+}
+.gd-card.lifted { opacity: .35; }
+.gd-ghost { position: fixed; z-index: 200; width: 108px; transform: translate(-50%, -50%);
+  pointer-events: none; opacity: .92; box-shadow: 0 12px 30px rgba(0, 0, 0, .55); }
 
 /* Picking the five: faces big enough to tap without looking, with how much
    each has played underneath. */
@@ -946,7 +994,17 @@ textarea.input { resize: vertical; line-height: 1.45; }
   /* Crossing shares a row with the touchdown here rather than taking one of
      its own — a whole row is the difference between reaching the buttons and
      scrolling for them. */
-  .gd-cross { grid-column: auto; font-size: 14px; padding: 0 8px; }
+  .gd-cross { font-size: 14px; padding: 0 8px; }
+  .gameday .page-head { margin: 4px 0 10px; gap: 8px; }
+  .gameday .page-head h1 { font-size: 26px; }
+  .gameday .head-actions .btn { min-height: 38px; padding: 0 12px; font-size: 14px; }
+  .gd-clock { gap: 6px; margin-bottom: 4px; }
+  .gd-clock-btn { width: 34px; height: 34px; }
+  .gd-clock-time { font-size: 24px; }
+  .gd-spots { gap: 5px; margin-bottom: 14px; }
+  .gd-spot { padding: 5px; border-radius: 12px; }
+  .gd-spot-tag { left: 3px; top: 3px; font-size: 10px; padding: 1px 5px; }
+  .gd-spot .gd-card-name { font-size: 11px; }
   /* Three faces across rather than two, so a squad fits without scrolling. */
   .gd-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .gd-card { padding: 6px; border-radius: 13px; }

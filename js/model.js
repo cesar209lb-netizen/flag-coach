@@ -64,7 +64,7 @@ export const sameDefense = (a, b) =>
 export function defaultSettings() {
   return {
     id: 'settings', teamName: 'My Team',
-    fieldWidth: 30, passClock: 7, rushDistance: 8,
+    fieldWidth: 30, passClock: 7, rushDistance: 8, halfMinutes: 20,
     activeSeasonId: null, lastBackupAt: null, lastChangeAt: null,
     tags: [...DEFAULT_TAGS], seeded: false, createdAt: Date.now(),
   };
@@ -88,14 +88,39 @@ export const phaseOf = (game) => (game?.phase === 'score' ? 'score' : 'mid');
 // Five on the field, always. It is the whole game.
 export const ON_FIELD = 5;
 
-export const newGame = (seasonId, opponent = '') => ({
+// A running clock that survives the app being closed: `ms` is what was left
+// when it last stopped, and `since` is when it started running. The time left
+// is always derived, never counted down in a variable that a backgrounded tab
+// would stop updating.
+export const newClock = (minutes = 20) => ({ half: 1, minutes, ms: Math.round(minutes * 60000), since: null });
+export const clockLeft = (c) => (!c ? 0 : Math.max(0, c.since ? c.ms - (Date.now() - c.since) : c.ms));
+export const clockRunning = (c) => !!c?.since && clockLeft(c) > 0;
+export function clockText(ms) {
+  const t = Math.ceil(ms / 1000);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+export const newGame = (seasonId, opponent = '', minutes = 20) => ({
   id: uid(), seasonId, opponent, date: Date.now(),
   us: 0, them: 0, down: 1, phase: 'mid', log: [],
-  // Who is on the field right now. Every snap records its own copy, so
+  clock: newClock(minutes),
+  // Who is playing where. Every snap records its own copy of both, so
   // substituting mid-drive does not rewrite who played the earlier plays.
-  onField: [],
+  spots: {}, onField: [],
   createdAt: Date.now(), updatedAt: Date.now(),
 });
+
+// The five on the field, in the order the positions are listed, from whichever
+// shape the game happens to carry: spots for a game that assigned positions,
+// the flat list for one recorded before positions existed.
+export function fieldSpots(game) {
+  const spots = game?.spots || {};
+  const used = SLOTS.map((slot) => ({ slot, playerId: spots[slot] || null }));
+  if (used.some((s) => s.playerId)) return used;
+  const flat = game?.onField || [];
+  return SLOTS.map((slot, i) => ({ slot, playerId: flat[i] || null }));
+}
+export const spotIds = (spots) => SLOTS.map((s) => spots[s]).filter(Boolean);
 
 // Where the next snap stands after this one. `crossed` is the coach saying the
 // play carried the ball over midfield, which is the first down.

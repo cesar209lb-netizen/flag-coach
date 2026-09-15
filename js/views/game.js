@@ -12,10 +12,11 @@
 // thing that works on paper works against people.
 
 import { h, icon, iconBtn, btn, segmented, openSheet, confirmDialog, promptDialog, toast, initials } from '../ui.js';
-import { state, subscribe, activeSeason, saveGame, deleteGame, gameById, playById, rosterFor } from '../store.js';
+import { state, subscribe, activeSeason, saveGame, saveSettings, deleteGame, gameById, playById, rosterFor } from '../store.js';
 import {
-  newGame, PLAY_RESULTS, PHASES, ON_FIELD, phaseOf, nextDown, playStats, uid,
-  formationGroups, formationSample, isPassPlay, ballEndsWith, snapRows,
+  newGame, PLAY_RESULTS, PHASES, ON_FIELD, SLOTS, SLOT_COLORS, SLOT_TEXT, phaseOf, nextDown,
+  newClock, clockLeft, clockRunning, clockText, fieldSpots, spotIds,
+  playStats, uid, formationGroups, formationSample, isPassPlay, ballEndsWith, snapRows,
 } from '../model.js';
 import { playThumb } from '../field.js';
 import { openHuddle } from './huddle.js';
@@ -37,7 +38,88 @@ export function mount(root) {
   rerenderFn = render;
   render();
   const unsub = subscribe(render);
-  return { destroy: () => { rerenderFn = null; unsub(); } };
+  // The clock redraws itself in place. Re-rendering the whole screen once a
+  // second would throw away scroll position and any half-finished tap.
+  const timer = setInterval(() => tickClock(root), 250);
+  return { destroy: () => { rerenderFn = null; clearInterval(timer); unsub(); } };
+}
+
+// ---------- Clock ----------
+
+const clockOf = (game) => game.clock || newClock(state.settings.halfMinutes || 20);
+
+function tickClock(root) {
+  const game = current();
+  if (!game) return;
+  const c = clockOf(game);
+  const el = root.querySelector('.gd-clock-time');
+  if (el) {
+    const left = clockLeft(c);
+    el.textContent = clockText(left);
+    el.classList.toggle('low', left <= 60000 && left > 0);
+    el.classList.toggle('done', left === 0);
+  }
+  // Ran out while nobody was looking: stop it once, and say so.
+  if (c.since && clockLeft(c) === 0) {
+    saveGame({ ...game, clock: { ...c, ms: 0, since: null } });
+    toast(`End of half ${c.half}`, { tone: 'warn', duration: 6000 });
+  }
+}
+
+async function toggleClock(game) {
+  const c = clockOf(game);
+  if (clockRunning(c)) {
+    await saveGame({ ...game, clock: { ...c, ms: clockLeft(c), since: null } });
+  } else {
+    if (clockLeft(c) === 0) return;
+    await saveGame({ ...game, clock: { ...c, since: Date.now() } });
+  }
+  rerender();
+}
+
+function clockSheet(game) {
+  const c = clockOf(game);
+  const body = h('div');
+  let minutes = c.minutes || state.settings.halfMinutes || 20;
+  const draw = () => body.replaceChildren(
+    h('div', { class: 'field-label' }, 'Half length',
+      segmented([10, 15, 20, 25].map((n) => ({ value: n, label: `${n} min` })), minutes, (v) => { minutes = v; draw(); })),
+    h('p', { class: 'p-help' }, 'Starting the next half puts the clock back to full and counts the half up. Restarting this one just puts the time back.'),
+    h('div', { class: 'btn-row' },
+      btn(`Start half ${c.half + 1}`, async () => {
+        await saveGame({ ...game, clock: { half: c.half + 1, minutes, ms: minutes * 60000, since: null } });
+        rerender();
+        toast(`Half ${c.half + 1} — clock reset`);
+      }, { kind: 'primary', iconName: 'next' }),
+      btn('Restart this half', async () => {
+        await saveGame({ ...game, clock: { ...c, minutes, ms: minutes * 60000, since: null } });
+        rerender();
+      }, { kind: 'ghost', iconName: 'restart' })));
+  draw();
+  openSheet({
+    title: `Half ${c.half}`,
+    size: 'sm',
+    body,
+    actions: [{ label: 'Done', kind: 'primary', onClick: () => saveSettings({ halfMinutes: minutes }, { silent: true }) }],
+  });
+}
+
+// The clock lives in the middle of the board with the down, the way a real
+// scoreboard reads — and a row of its own was the row the result buttons needed.
+function clockBar(game) {
+  const c = clockOf(game);
+  const left = clockLeft(c);
+  const running = clockRunning(c);
+  return h('div', { class: 'gd-clock' },
+    h('button', {
+      class: `gd-clock-btn ${running ? 'on' : ''}`, onclick: () => toggleClock(game),
+      'aria-label': running ? 'Stop the clock' : 'Start the clock', disabled: left === 0,
+    }, icon(running ? 'pause' : 'play')),
+    h('button', {
+      class: `gd-clock-time ${left <= 60000 && left > 0 ? 'low' : ''} ${left === 0 ? 'done' : ''}`,
+      onclick: () => clockSheet(game), title: `Half ${c.half}`,
+    }, clockText(left)),
+    h('span', { class: `gd-half ${left === 0 ? 'over' : ''}` }, left === 0 ? `H${c.half} over` : `H${c.half}`));
 }
 
 const gamesForSeason = () => {
@@ -58,7 +140,7 @@ const ordinal = (d) => ORD[Math.min(d, 4) - 1] || `${d}th`;
 // them and the first snap. The name is set afterwards by tapping the header.
 async function startGame() {
   const season = activeSeason();
-  const g = newGame(season?.id || null, '');
+  const g = newGame(season?.id || null, '', state.settings.halfMinutes || 20);
   // Carry the last game's lineup over — it is usually the same five kids, and
   // an empty field on the first snap is a worse default than a stale one.
   const prev = gamesForSeason()[0];
@@ -86,8 +168,12 @@ async function record(game, result, yards, crossed = false) {
     // Who got it, as a slot, plus the roster id if somebody is assigned there —
     // the slot survives a roster change, the id is what playing time counts.
     to: pending?.to || null,
-    toName: pending?.to ? carrierLabel(play, pending.to) : null,
+    toName: pending?.to ? carrierLabel(play, pending.to, game) : null,
+    // The kid at that position when the snap happened, so the log survives a
+    // substitution later in the drive.
+    toPlayerId: (pending?.to && game.spots?.[pending.to]) || null,
     onField: [...(game.onField || [])],
+    spots: { ...(game.spots || {}) },
     down: game.down, phase: phaseOf(game), crossed: crossed || undefined,
     result, yards, at: Date.now(),
   };
@@ -113,8 +199,6 @@ async function undoLast(game) {
 
 // ---------- Who is on the field ----------
 
-const onFieldRoster = (game) => rosterFor().filter((r) => (game.onField || []).includes(r.player.id));
-
 function avatarOf(player, cls = '') {
   return player.photo
     ? h('img', { class: `gd-av ${cls}`.trim(), src: player.photo, alt: '' })
@@ -127,106 +211,182 @@ function lineupBar(game) {
     return h('button', { class: 'gd-lineup empty', onclick: () => { location.hash = '#/roster'; } },
       icon('users'), h('span', null, 'Add players on the Roster tab to track who is on the field'));
   }
-  const on = onFieldRoster(game);
   const { rows } = snapRows(game, roster);
-  const bench = rows.filter((r) => !(game.onField || []).includes(r.player.id));
+  const spots = fieldSpots(game);
+  const filled = spots.filter((s) => s.playerId).length;
+  const onIds = spots.map((s) => s.playerId).filter(Boolean);
+  const bench = rows.filter((r) => !onIds.includes(r.player.id));
   const next = bench.slice(0, 2).map((r) => r.player.first).join(', ');
-  // Five slots, always, with the gaps drawn — a missing kid should be as
-  // obvious as a present one.
-  const slots = [];
-  for (let i = 0; i < ON_FIELD; i++) {
-    const r = on[i];
-    slots.push(r
-      ? h('span', { class: 'gd-av-wrap', title: r.player.first },
-        avatarOf(r.player),
-        r.entry.number ? h('span', { class: 'gd-av-num' }, r.entry.number) : null)
-      : h('span', { class: 'gd-av-wrap' }, h('span', { class: 'gd-av gap' })));
-  }
-  const short = on.length < ON_FIELD;
+  // One slot per position, always, with the gaps drawn — a position nobody is
+  // playing should be as obvious as one somebody is.
+  const short = filled < ON_FIELD;
   return h('button', { class: `gd-lineup ${short ? 'short' : ''}`, onclick: () => lineupSheet(game) },
-    h('span', { class: 'gd-lineup-label' }, short ? `${on.length} of ${ON_FIELD} — tap to fill` : 'On the field'),
-    h('span', { class: 'gd-avs' }, ...slots),
+    h('span', { class: 'gd-lineup-label' }, short ? `${filled} of ${ON_FIELD} — tap to fill` : 'On the field'),
+    h('span', { class: 'gd-avs' }, ...spots.map(({ slot, playerId }) => {
+      const r = roster.find((x) => x.player.id === playerId);
+      return h('span', { class: 'gd-av-wrap', title: r ? `${r.player.first} at ${slot}` : slot },
+        r ? avatarOf(r.player) : h('span', { class: 'gd-av gap' }),
+        h('span', { class: 'gd-av-slot', style: { background: SLOT_COLORS[slot], color: SLOT_TEXT[slot] } }, slot));
+    })),
     h('div', { class: 'spacer' }),
     next ? h('span', { class: 'gd-next muted small' }, `Up next: ${next}`) : null,
     icon('next', 'chev'));
 }
 
-// Picking the five. Two zones with the pictures big enough to tap without
-// looking: who is out there, and who is waiting with how much they have played.
-// Tapping moves a kid between them, which is the whole interaction.
+// Picking the five, by position. Five position cards across the top and the
+// squad underneath: tap a player to drop them into the spot you picked (or the
+// first empty one), drag them onto a spot, or tap a spot to send that player
+// back. The positions are the play's own — the X on this card is the X on every
+// diagram in the playbook.
 function lineupSheet(game) {
   const roster = rosterFor();
   const body = h('div');
-  let picked = [...(game.onField || [])];
+  let spots = Object.fromEntries(fieldSpots(game).map(({ slot, playerId }) => [slot, playerId]));
+  let aim = null;   // the position waiting for somebody, if one was tapped
   let doneBtn = null;
 
-  const card = (row, on) => {
-    const { player, entry, snaps, pct } = row;
-    const full = !on && picked.length >= ON_FIELD;
+  const playerOf = (id) => roster.find((r) => r.player.id === id) || null;
+  const firstEmpty = () => SLOTS.find((sl) => !spots[sl]) || null;
+
+  const place = (slot, playerId) => {
+    // A player only stands in one place; taking a spot gives up the old one.
+    for (const sl of SLOTS) if (spots[sl] === playerId) spots[sl] = null;
+    spots[slot] = playerId;
+    aim = null;
+    draw();
+  };
+  const clear = (slot) => { spots[slot] = null; aim = slot; draw(); };
+
+  const spotCard = (slot) => {
+    const r = playerOf(spots[slot]);
     return h('button', {
-      class: `gd-card ${on ? 'on' : ''} ${full ? 'full' : ''}`,
+      class: `gd-spot ${r ? 'on' : ''} ${aim === slot ? 'aim' : ''}`,
+      dataset: { spot: slot },
+      onclick: () => { if (r) clear(slot); else { aim = aim === slot ? null : slot; draw(); } },
+    },
+    h('span', { class: 'gd-spot-tag', style: { background: SLOT_COLORS[slot], color: SLOT_TEXT[slot] } }, slot),
+    h('div', { class: 'gd-spot-photo' },
+      r ? (r.player.photo
+        ? h('img', { src: r.player.photo, alt: '', draggable: 'false' })
+        : h('span', { class: 'gd-card-initials' }, initials(r.player)))
+        : h('span', { class: 'gd-spot-empty' }, icon('plus'))),
+    h('div', { class: 'gd-card-name' }, r ? r.player.first : 'Empty'));
+  };
+
+  const benchCard = ({ player, entry, snaps, pct }) => {
+    const card = h('button', {
+      class: 'gd-card bench',
+      dataset: { player: player.id },
       onclick: () => {
-        if (full) { toast(`Five on the field — take someone off first`); return; }
-        picked = on ? picked.filter((id) => id !== player.id) : [...picked, player.id];
-        draw();
+        const slot = aim || firstEmpty();
+        if (!slot) { toast('Every position is filled — tap one to free it up'); return; }
+        place(slot, player.id);
       },
     },
     h('div', { class: 'gd-card-photo' },
-      player.photo ? h('img', { src: player.photo, alt: '' }) : h('span', { class: 'gd-card-initials' }, initials(player)),
-      entry.number ? h('span', { class: 'gd-card-num' }, `#${entry.number}`) : null,
-      on ? h('span', { class: 'gd-card-tick' }, icon('check')) : null),
+      player.photo ? h('img', { src: player.photo, alt: '', draggable: 'false' }) : h('span', { class: 'gd-card-initials' }, initials(player)),
+      entry.number ? h('span', { class: 'gd-card-num' }, `#${entry.number}`) : null),
     h('div', { class: 'gd-card-name' }, player.first),
     h('div', { class: 'gd-card-time' },
       h('span', null, `${snaps} snap${snaps === 1 ? '' : 's'}`),
       h('div', { class: 'gd-bar' }, h('i', { style: { width: `${pct}%` } }))));
+    dragFrom(card, player.id);
+    return card;
   };
 
+  // Dragging a face onto a position. Pointer events rather than HTML5 drag,
+  // which a tablet does not give you, and the card captures the pointer so the
+  // moves keep coming once the finger leaves it. A drag that never really moved
+  // falls through to the card's own tap handler.
+  let drag = null;
+  const clearOver = () => { for (const el of body.querySelectorAll('.gd-spot.over')) el.classList.remove('over'); };
+  const endDrag = () => {
+    drag?.ghost?.remove();
+    drag?.card.classList.remove('lifted');
+    clearOver();
+    drag = null;
+  };
+
+  function dragFrom(card, playerId) {
+    card.addEventListener('pointerdown', (e) => {
+      if (drag) return;
+      drag = { playerId, id: e.pointerId, x: e.clientX, y: e.clientY, ghost: null, card };
+      // Without this the moves stop arriving the moment the finger leaves the
+      // card, which is exactly when a drag becomes interesting.
+      try { card.setPointerCapture(e.pointerId); } catch { /* no capture here */ }
+    });
+    card.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag.ghost && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+      if (!drag.ghost) {
+        drag.ghost = drag.card.cloneNode(true);
+        drag.ghost.className = 'gd-card bench gd-ghost';
+        document.body.append(drag.ghost);
+        drag.card.classList.add('lifted');
+      }
+      drag.ghost.style.left = `${e.clientX}px`;
+      drag.ghost.style.top = `${e.clientY}px`;
+      const over = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.gd-spot');
+      for (const el of body.querySelectorAll('.gd-spot')) el.classList.toggle('over', el === over);
+    });
+    const finish = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dropped = !!drag.ghost;
+      const over = dropped && document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.gd-spot');
+      const held = drag.playerId;
+      endDrag();
+      // Never moved: leave it to the click that is about to follow.
+      if (dropped && over?.dataset.spot) place(over.dataset.spot, held);
+    };
+    card.addEventListener('pointerup', finish);
+    card.addEventListener('pointercancel', finish);
+  }
+
   const draw = () => {
-    // Fewest snaps first on the bench, so the kid who is owed a turn is first.
     const { rows, total } = snapRows(game, roster);
-    const on = rows.filter((r) => picked.includes(r.player.id));
-    const off = rows.filter((r) => !picked.includes(r.player.id));
-    if (doneBtn) doneBtn.disabled = picked.length !== ON_FIELD;
+    const onIds = spotIds(spots);
+    const off = rows.filter((r) => !onIds.includes(r.player.id));
+    if (doneBtn) doneBtn.disabled = onIds.length !== ON_FIELD;
     body.replaceChildren(
-      h('div', { class: `gd-fieldcount ${picked.length === ON_FIELD ? 'ok' : ''}` },
-        h('b', null, `${picked.length} of ${ON_FIELD} on the field`),
-        h('span', { class: 'muted small' }, total ? `${total} snaps logged so far` : 'nothing logged yet')),
-      h('div', { class: 'section-label' }, 'On the field'),
-      on.length
-        ? h('div', { class: 'gd-cards' }, ...on.map((r) => card(r, true)))
-        : h('p', { class: 'p-help' }, 'Nobody yet — tap five from the bench.'),
-      h('div', { class: 'section-label' }, picked.length >= ON_FIELD ? 'Bench — take someone off to swap' : 'Bench — least playing time first'),
-      off.length
-        ? h('div', { class: 'gd-cards' }, ...off.map((r) => card(r, false)))
-        : h('p', { class: 'p-help' }, 'Everybody is in.'));
+      h('div', { class: `gd-fieldcount ${onIds.length === ON_FIELD ? 'ok' : ''}` },
+        h('b', null, `${onIds.length} of ${ON_FIELD} positions filled`),
+        h('span', { class: 'muted small' }, aim ? `Tap a player to put them at ${aim}`
+          : total ? `${total} snaps logged so far` : 'Tap a player, or drag them onto a spot')),
+      h('div', { class: 'gd-spots' }, ...SLOTS.map(spotCard)),
+      h('div', { class: 'section-label' }, off.length ? 'Squad — least playing time first' : 'Everybody is in'),
+      off.length ? h('div', { class: 'gd-cards' }, ...off.map(benchCard)) : null);
   };
   draw();
 
   const sheet = openSheet({
     title: 'On the field',
     size: 'lg',
+    onClose: endDrag,
     body,
     actions: [
       { label: 'Cancel', kind: 'ghost' },
       {
         label: 'Done', kind: 'primary',
         onClick: async () => {
-          if (picked.length !== ON_FIELD) return false;
-          await saveGame({ ...game, onField: picked });
+          const ids = spotIds(spots);
+          if (ids.length !== ON_FIELD) return false;
+          await saveGame({ ...game, spots, onField: ids });
           rerender();
         },
       },
     ],
   });
   doneBtn = sheet.panel.querySelector('.sheet-foot .btn.primary');
-  if (doneBtn) doneBtn.disabled = picked.length !== ON_FIELD;
+  if (doneBtn) doneBtn.disabled = spotIds(spots).length !== ON_FIELD;
 }
 
 // ---------- Calling a play ----------
 
-// What to call the player a slot belongs to: their name if somebody is assigned
-// to it in this play, otherwise the slot's own label.
-function carrierLabel(play, slot) {
+// What to call whoever is at a spot: the kid playing that position in this game
+// first, then anyone the play itself assigns there, then the position's label.
+function carrierLabel(play, slot, game) {
+  const playing = game?.spots?.[slot] && state.players.find((x) => x.id === game.spots[slot]);
+  if (playing) return playing.first;
   const p = play?.players.find((q) => q.slot === slot);
   if (!p) return slot;
   const assigned = p.assigned && state.players.find((x) => x.id === p.assigned);
@@ -340,7 +500,7 @@ function pendingCard(game) {
       h('div', { class: 'gd-to-chips' }, ...slots.map((slot) => h('button', {
         class: `chip-btn ${pending.to === slot ? 'on' : ''}`,
         onclick: () => { pending = { ...pending, to: slot }; rerender(); },
-      }, carrierLabel(play, slot))))) : null,
+      }, carrierLabel(play, slot, game))))) : null,
 
     yardRow,
     // The first down of a flag series is crossing midfield, so it is a button of
@@ -378,11 +538,10 @@ function scoreboard(game) {
   return h('section', { class: 'gd-board' },
     col('us', state.settings.teamName || 'Us'),
     h('div', { class: 'gd-dd' },
+      clockBar(game),
       h('button', { class: 'gd-dd-main', onclick: () => downSheet(game) },
         h('span', { class: 'gd-down' }, `${ordinal(game.down)} down`),
-        h('span', { class: `gd-togo ${phaseOf(game)}` }, PHASES[phaseOf(game)])),
-      h('div', { class: 'btn-row tight center' },
-        btn('New series', async () => { await saveGame({ ...game, down: 1, phase: 'mid' }); rerender(); }, { kind: 'small ghost' }))),
+        h('span', { class: `gd-togo ${phaseOf(game)}` }, PHASES[phaseOf(game)]))),
     col('them', game.opponent || 'Them'));
 }
 
@@ -397,7 +556,9 @@ function downSheet(game) {
       segmented([1, 2, 3, 4].map((n) => ({ value: n, label: ordinal(n) })), down, (v) => { down = v; draw(); })),
     h('div', { class: 'field-label' }, 'Going',
       segmented([{ value: 'mid', label: PHASES.mid }, { value: 'score', label: PHASES.score }], phase,
-        (v) => { phase = v; draw(); })));
+        (v) => { phase = v; draw(); })),
+    h('div', { class: 'btn-row' },
+      btn('New series', () => { down = 1; phase = 'mid'; draw(); }, { kind: 'ghost', iconName: 'restart' })));
   draw();
   openSheet({
     title: 'Down',
