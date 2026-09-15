@@ -332,6 +332,42 @@ export function formationSample(name, W) {
   return play;
 }
 
+// Every name a play can file under: the model's formations and the mirrored
+// names a flip produces, in the order the picker should offer them.
+export function formationNames() {
+  const out = [];
+  for (const f of FORMATIONS) {
+    out.push(f.name);
+    const m = swapLR(f.name);
+    if (m !== f.name) out.push(m);
+  }
+  return out;
+}
+
+// The formation a play's players are actually standing in, if they are close
+// enough to one of the model's — mirrored ones included. Drag people into a
+// new look and the app can offer to file the play where it now belongs,
+// instead of leaving it under whatever it started as. Null when the alignment
+// is the coach's own and matches nothing.
+export function matchFormation(play, W, tol = 1.6) {
+  let best = null;
+  for (const f of FORMATIONS) {
+    for (const mirror of [false, true]) {
+      let sum = 0;
+      for (const slot of SLOTS) {
+        const at = formationPos(f, slot, W);
+        const x = mirror ? W - at.x : at.x;
+        const p = play.players.find((q) => q.slot === slot);
+        if (!p) { sum = Infinity; break; }
+        sum += Math.hypot(p.x - x, p.y - at.y);
+      }
+      const avg = sum / SLOTS.length;
+      if (avg <= tol && (!best || avg < best.avg)) best = { name: mirror ? swapLR(f.name) : f.name, avg };
+    }
+  }
+  return best ? best.name : null;
+}
+
 // A play is a pass if the quarterback ever throws it. Everything else — a
 // handoff, a pitch, a sweep — is a run, even when it starts out looking like a
 // pass. A flea flicker ends in a throw, so it counts as a pass.

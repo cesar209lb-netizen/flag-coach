@@ -55,6 +55,19 @@ Flipping a play renames its formation with it ("Trips Right" becomes
 "Trips Left"), so a mirrored play gets its own card next to the one it mirrors
 rather than hiding inside it.
 
+Which formation a play files under is its own thing, separate from where anyone
+is standing — a play can live in a formation it does not line up in exactly. The
+play editor's Formation section opens with **Files under**, and **Change** picks
+from the model's formations, their mirrors, and any name already in use in the
+playbook, or takes one of your own ("Empty", "Trey"). A name the app does not
+know still gets its own card in the picker, drawn from one of its plays.
+
+Drag people into a different look and the editor notices: **"Everyone is lined
+up in Trips Right"** with a one-tap button to file it there. It compares every
+player against each formation and its mirror, so it only speaks up when the
+alignment really is one of them — and it never relabels anything on its own,
+since the label is the coach's call.
+
 ## Route lab
 
 The **Routes** tab is a standalone drill: one QB, one receiver, and a route.

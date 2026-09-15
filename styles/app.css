@@ -221,6 +221,18 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .kind-tag.run { background: rgba(34, 197, 94, .16); color: #86efac; }
 .play-meta > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Which formation a play files under in the playbook — the label, not where
+   anybody stands, so it lives apart from the formation chips above it. */
+.files-under { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fu-label { color: var(--muted); font-size: 13px; font-weight: 650; }
+.fu-name { font-size: 15px; font-weight: 750; }
+.files-under .btn { margin-left: auto; }
+.fu-hint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 0;
+  padding: 10px 12px; border-radius: 12px; background: rgba(255, 107, 26, .12);
+  border: 1px solid rgba(255, 107, 26, .3); font-size: 13px; color: var(--text); }
+.fu-hint .btn { margin-left: auto; }
+.fu-wrap { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+
 /* ---------- Field SVG ---------- */
 .field-svg { display: block; touch-action: none; }
 .field-svg text { font-family: var(--round); pointer-events: none; }
