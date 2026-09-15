@@ -1,11 +1,11 @@
 // Play designer: drag players, tap/draw routes, motion, ball events, defense, animation.
 
-import { h, icon, iconBtn, btn, segmented, stepper, stars, toast, confirmDialog, actionSheet, promptDialog } from '../ui.js';
+import { h, icon, iconBtn, btn, segmented, stepper, stars, toast, confirmDialog, actionSheet, promptDialog, openSheet } from '../ui.js';
 import { state, playById, savePlay, deletePlay, rosterFor, tokenInfo, saveSettings } from '../store.js';
 import {
   SLOT_COLORS, SLOT_TEXT, ROUTES, QB_ROUTES, FORMATIONS, COVERAGES, LOOKS, applyRoute, applyFormation, flipPlay,
   copyPlay, snapPos, absRoute, absMotion, routeLabel, autoPassTarget, passTarget, uid,
-  lookById, coverageById, defenseOf, sameDefense, mirrorLook,
+  lookById, coverageById, defenseOf, sameDefense, mirrorLook, formationNames, matchFormation, formationKey,
 } from '../model.js';
 import { EDIT_VIEW, viewBox, fieldMarkup, routesMarkup, tokenMarkup, pathD, zonesMarkup, defenseMarkup } from '../field.js';
 import { simulate, bestThrowTime, alignFor, frameAt } from '../sim.js';
@@ -509,7 +509,10 @@ export function mount(root, playId) {
     const scroll = panelBody.scrollTop;
     const content = tab === 'player' ? (sel ? playerPanel() : overviewPanel())
       : tab === 'ball' ? ballPanel() : tab === 'defense' ? defensePanel() : detailsPanel();
-    panelBody.replaceChildren(content);
+    // Dragging someone selects them, so the formation notice has to sit above
+    // whichever Players panel is open, not inside the overview it started in —
+    // the moment it has something to say is the moment you let go of a player.
+    panelBody.replaceChildren(...[tab === 'player' ? formationHint() : null, content].filter(Boolean));
     panelBody.scrollTop = scroll;
   }
 
@@ -543,13 +546,70 @@ export function mount(root, playId) {
             p.read ? h('span', { class: 'read-chip' }, `Read ${p.read}`) : null,
             icon('next', 'chev'));
         }))),
+      // What it is called comes first: it is what the playbook files the play
+      // under, and a coach who has just dragged people around is looking for it.
       section('Formation',
-        h('p', { class: 'p-help' }, 'Moves players into position. Routes stay attached.'),
+        filesUnder(),
+        h('p', { class: 'p-help' }, 'Or tap one of these to move everyone into it. Routes stay attached.'),
         h('div', { class: 'chip-grid' }, FORMATIONS.map((f) =>
           h('button', { class: `chip-btn ${current === f.id ? 'on' : ''}`, onclick: () => commit(() => applyFormation(play, f.id, W)) }, f.name))),
         h('div', { class: 'btn-row' },
           btn('Flip play left to right', flipCurrent, { iconName: 'flip', kind: 'ghost' }))),
       section(null, resultCard()));
+  }
+
+  // Which formation the play files under in the playbook. Dragging people into
+  // a new look does not relabel the play on its own — the label is the coach's
+  // call, since a play can live in a formation it does not stand in exactly —
+  // so this is where it gets changed, and the app offers what it sees.
+  function filesUnder() {
+    return h('div', { class: 'fu-wrap' },
+      h('div', { class: 'files-under' },
+        h('span', { class: 'fu-label' }, 'Files under'),
+        h('b', { class: 'fu-name' }, formationKey(play)),
+        btn('Change', openFilesUnder, { iconName: 'edit', kind: 'small ghost' })));
+  }
+
+  // Shown only when the players have been dragged into a look the play is not
+  // filed under. It rides at the top of the panel rather than down in the
+  // Formation section, which is below the fold on a phone and an upright iPad.
+  function formationHint() {
+    const filed = formationKey(play);
+    const looksLike = matchFormation(play, W);
+    if (!looksLike || looksLike === filed) return null;
+    return h('div', { class: 'fu-hint' },
+      h('span', null, `Everyone is lined up in ${looksLike}.`),
+      btn(`File under ${looksLike}`, () => commit(() => { play.formation = looksLike; }, { tokens: false }),
+        { kind: 'small primary' }));
+  }
+
+  function openFilesUnder() {
+    const filed = formationKey(play);
+    // The model's formations and their mirrors, plus any name already in use in
+    // this playbook, so a look the coach invented can be reused rather than
+    // retyped into a second spelling.
+    const known = formationNames();
+    const mine = [...new Set(state.plays.map(formationKey))].filter((n) => !known.includes(n)).sort();
+    const grid = h('div', { class: 'chip-grid' });
+    const sheet = openSheet({
+      title: 'Files under',
+      body: h('div', null,
+        h('p', { class: 'p-help' }, 'Which formation this play shows under in the playbook. This changes the label only — nobody on the field moves.'),
+        grid),
+    });
+    const pick = (name) => {
+      sheet.close();
+      if (name !== filed) commit(() => { play.formation = name; }, { tokens: false });
+    };
+    grid.replaceChildren(
+      ...[...known, ...mine].map((n) => h('button', { class: `chip-btn ${n === filed ? 'on' : ''}`, onclick: () => pick(n) }, n)),
+      h('button', {
+        class: 'chip-btn add',
+        onclick: async () => {
+          const name = await promptDialog({ title: 'Formation name', label: 'Name', placeholder: 'e.g. Empty', confirmText: 'Use it' });
+          if (name) pick(name);
+        },
+      }, '+ Other name'));
   }
 
   function playerPanel() {

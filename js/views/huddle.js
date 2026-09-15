@@ -1,11 +1,11 @@
 // Full-screen huddle mode: big field, looping animation, swipe between plays.
 
-import { h, icon, iconBtn, segmented } from '../ui.js';
+import { h, icon, iconBtn, btn, segmented } from '../ui.js';
 import { state, playById } from '../store.js';
 import { HUDDLE_VIEW, fieldMarkup } from '../field.js';
 import { PlayStage, simContext, simBounds } from '../stage.js';
 import { bestThrowTime } from '../sim.js';
-import { defenseOf, defenseLabel } from '../model.js';
+import { defenseOf, defenseLabel, flipPlay } from '../model.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 // Sideline padding, breathing room above/below the action, and the tightest
@@ -40,6 +40,10 @@ export function openHuddle(playIds, startIndex = 0) {
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.innerHTML = `<g>${fieldMarkup(W, { view: HUDDLE_VIEW, rushDistance: state.settings.rushDistance, pad: PAD_X })}</g><g></g>`;
   let focus = prefFocus.get();
+  // Showing the play run to the other side. Display only, like the focus
+  // picker below — the coach's saved play is never touched, so this is safe to
+  // hand a player device too. Starts off on every new huddle.
+  let mirrored = false;
   const stage = new PlayStage(svg.children[1], { loop: false, r: 1.3, onUpdate: onStage, focus: focus || null });
   stage.speed = huddleSpeed;
 
@@ -53,20 +57,20 @@ export function openHuddle(playIds, startIndex = 0) {
   const nextBtn = iconBtn('next', () => go(1), { title: 'Next play', cls: 'big' });
   const speedWrap = h('div');
   const defWrap = h('div');
+  const flipBtn = btn('Flip', () => { mirrored = !mirrored; renderControls(); load(); },
+    { iconName: 'flip', kind: 'ghost', cls: 'hd-flip', title: 'Show the play run to the other side' });
   const focusWrap = h('div', { class: 'hd-focus' });
 
   const fieldBox = h('div', { class: 'hd-field' }, svg, result);
   const topBar = h('header', { class: 'hd-top' },
-    h('div', { class: 'hd-heading' }, title, sub),
+    h('div', { class: 'hd-heading' }, title, sub, notes),
     h('div', { class: 'spacer' }),
     counter,
     iconBtn('x', close, { title: 'Close huddle mode', cls: 'big' }));
   const bottomBar = h('footer', { class: 'hd-bottom' },
     prevBtn, playBtn, nextBtn,
     h('div', { class: 'spacer' }),
-    notes,
-    h('div', { class: 'spacer' }),
-    focusWrap, defWrap, speedWrap);
+    focusWrap, flipBtn, defWrap, speedWrap);
 
   const overlay = h('div', { class: 'huddle' }, topBar, fieldBox, bottomBar);
 
@@ -75,6 +79,8 @@ export function openHuddle(playIds, startIndex = 0) {
       (v) => { stage.speed = huddleSpeed = v; renderControls(); }, { cls: 'small' }));
     defWrap.replaceChildren(segmented([{ value: true, label: 'Defense' }, { value: false, label: 'Routes only' }], showDefense,
       (v) => { showDefense = v; renderControls(); load(); }, { cls: 'small' }));
+    flipBtn.classList.toggle('on', mirrored);
+    flipBtn.setAttribute('aria-pressed', String(mirrored));
     // "Who am I" — spotlights one player's route through the whole playbook.
     const play = playById(ids[index]);
     const opts = [{ value: '', label: 'All' }, ...(play?.players || [])
@@ -166,14 +172,21 @@ export function openHuddle(playIds, startIndex = 0) {
     const play = playById(ids[index]);
     const base = showDefense ? play : { ...play, defense: { coverage: 'none', rush: false } };
     const ctx = simContext(play);
-    const shown = throwTo(base, focus, ctx);
+    let shown = throwTo(base, focus, ctx);
+    // `base` can be the stored play itself, and throwTo hands it straight back
+    // when there is nothing to re-aim — so clone before mirroring, or the flip
+    // would rewrite the playbook.
+    if (mirrored) { shown = structuredClone(shown); flipPlay(shown, W); }
     const aimed = !!focus && shown.players.some((p) => p.slot === focus)
       && !!shown.ball.find((b) => b.type === 'pass');
+    // The title stays the play as it is called, whichever way it is being
+    // shown; the line under it says what is actually on the field.
     title.textContent = play.name;
-    const def = defenseOf(play);
+    const def = defenseOf(shown);
     const focusLabel = play.players.find((p) => p.slot === focus)?.label || focus;
     sub.textContent = [
-      play.formation,
+      shown.formation,
+      mirrored ? 'flipped' : null,
       showDefense && def.coverage !== 'none' ? `vs ${defenseLabel(def)}` : null,
       aimed ? `ball to ${focusLabel}` : null,
     ].filter(Boolean).join(' · ');
@@ -213,6 +226,7 @@ export function openHuddle(playIds, startIndex = 0) {
     else if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === ' ') { e.preventDefault(); stage.toggle(); }
+    else if (e.key === 'f' || e.key === 'F') { mirrored = !mirrored; renderControls(); load(); }
   };
   document.addEventListener('keydown', onKey);
 

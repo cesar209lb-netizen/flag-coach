@@ -6,7 +6,7 @@ import { h, icon, iconBtn, btn, stars, openSheet, actionSheet, confirmDialog, to
 import { state, subscribe, savePlay, deletePlay } from '../store.js';
 import {
   FORMATIONS, newPlay, copyPlay, flipPlay, playStats,
-  formationKey, formationInfo, formationSample, isPassPlay, passRunCount,
+  formationKey, formationInfo, formationSample, formationGroups, isPassPlay, passRunCount,
 } from '../model.js';
 import { playThumb } from '../field.js';
 import { openHuddle } from './huddle.js';
@@ -125,35 +125,9 @@ export function mount(root, arg) {
 
   // ---------- Formation picker ----------
 
-  // The formations this playbook actually runs, with their plays and how those
-  // split between pass and run. A formation with nothing in it is not a card —
-  // the picker is what the team has, and the New Play sheet is where the rest
-  // of the formations live. Ordered by how many plays each holds, so the
-  // formation the team lives in lands top left; ties keep the order the model
-  // lists formations in, with a mirrored variant ("Trips Left") right after the
-  // formation it mirrors and custom last.
-  function groups() {
-    const byName = new Map();
-    for (const p of state.plays) {
-      const k = formationKey(p);
-      if (!byName.has(k)) byName.set(k, []);
-      byName.get(k).push(p);
-    }
-    const out = [];
-    const take = (name) => {
-      const plays = byName.get(name);
-      if (!plays) return;
-      byName.delete(name);
-      out.push({ name, plays, ...passRunCount(plays), ...formationInfo(name) });
-    };
-    for (const f of FORMATIONS) {
-      take(f.name);
-      const mirrored = [...byName.keys()].find((n) => formationInfo(n).id === f.id);
-      if (mirrored) take(mirrored);
-    }
-    for (const name of [...byName.keys()].sort()) take(name);
-    return out.map((g, i) => ({ ...g, order: i })).sort((a, b) => b.total - a.total || a.order - b.order);
-  }
+  // A formation with nothing in it is not a card — the picker is what the team
+  // has, and the New Play sheet is where the rest of the formations live.
+  const groups = () => formationGroups(state.plays);
 
   function formationCard(g, W) {
     // A formation the app knows is drawn from the model so the card shows the

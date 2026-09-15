@@ -55,6 +55,19 @@ Flipping a play renames its formation with it ("Trips Right" becomes
 "Trips Left"), so a mirrored play gets its own card next to the one it mirrors
 rather than hiding inside it.
 
+Which formation a play files under is its own thing, separate from where anyone
+is standing — a play can live in a formation it does not line up in exactly. The
+play editor's Formation section opens with **Files under**, and **Change** picks
+from the model's formations, their mirrors, and any name already in use in the
+playbook, or takes one of your own ("Empty", "Trey"). A name the app does not
+know still gets its own card in the picker, drawn from one of its plays.
+
+Drag people into a different look and the editor notices: **"Everyone is lined
+up in Trips Right"** with a one-tap button to file it there. It compares every
+player against each formation and its mirror, so it only speaks up when the
+alignment really is one of them — and it never relabels anything on its own,
+since the label is the coach's call.
+
 ## Route lab
 
 The **Routes** tab is a standalone drill: one QB, one receiver, and a route.
@@ -110,8 +123,10 @@ A player device gets the playbook and full-screen animated Huddle mode, with no
 Roster tab, no editing and no New Play. In Huddle mode the **Watch** picker
 spotlights one player's route and fades the rest, and aims the pass at them with
 the release timed for that route — so a kid sees the play with the ball coming
-to them. Local edits on a player device are refused outright rather than
-queued, so it stays an exact mirror of the coaches' playbook.
+to them. **Flip** shows the same play run to the other side. Both are views, not
+edits: they redraw a copy and never touch the saved play, which is why a player
+device can have them at all. Local edits on a player device are refused outright
+rather than queued, so it stays an exact mirror of the coaches' playbook.
 
 The player code is the SHA-256 of the coach's team code, and the store's row
 policy only lets it read rows of kind `play` and `settings`. So a leaked player
@@ -170,10 +185,33 @@ the app's greens comes out of a printer as a page of solid ink.
 
 ## Game day
 
-The **Game** tab keeps score and records what you called. Pick a play from the
-numbered list, tap Touchdown, Gain, No gain, Loss or Turnover, and that is the
-snap logged. Down and distance keep themselves — the chains move, downs
-advance, four and out starts a new series — and **Undo last** fixes a wrong tap.
+The **Game** tab keeps score and records what you called, built for a coach
+holding a tablet with eight seconds to the next snap.
+
+**Calling a play** is formation first and then the play, drawn — the same order
+the playbook is in, so what you want is where you already know it is. Plays you
+have already called this game sit at the top as **Called already**, because a
+second helping should be one tap. Search jumps past both.
+
+**Once it is called** you get the diagram, the down, and **Show team** — the
+same full-screen Huddle mode with its animation, Watch picker and Flip. **Ball
+to** is filled in from the play itself (whoever the throw is aimed at, or
+whoever takes the last handoff), so a play that goes as drawn needs no tap at
+all; tap a different spot when it does not. Then Touchdown, Gain, No gain, Loss
+or Turnover and the snap is logged. Down and distance keep themselves — the
+chains move, downs advance, four and out starts a new series — and **Undo last**
+fixes a wrong tap.
+
+**Who is on the field** is the strip of faces above the play caller. Tap it to
+sub: the sheet lists the roster **fewest snaps first**, so the next kid up is at
+the top, and it tells you how many are out there. Every snap you log records its
+own copy of the lineup, so substituting mid-drive does not rewrite who played
+the plays before it.
+
+**Playing time** is the other tab under the summary: snaps and share of the
+game per player, fewest first, with whoever is currently on the field outlined.
+Snaps are the unit a flag game actually has — nobody is timing a stopwatch on
+the sideline.
 
 Those results come back to the playbook: a play carries its real average and
 touchdown count next to its rating, so you can see whether the thing that works
