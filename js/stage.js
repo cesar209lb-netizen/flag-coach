@@ -56,7 +56,7 @@ export class PlayStage {
     this.playData = play;
     this.ctx = ctx;
     this.sim = sim || simulate(play, ctx);
-    this.gRoutes.innerHTML = routesMarkup(play, { faint: !this.focus, focus: this.focus, target: this.sim.target });
+    this.gRoutes.innerHTML = routesMarkup(play, { focus: this.focus, target: this.sim.target });
     this.gOff.innerHTML = play.players.map((p) =>
       `<g><circle class="ring" r="${this.r + 0.75}" fill="none" stroke-width=".3" opacity="0"/>${tokenMarkup(p, ctx.tokenInfo(p.assigned), { r: this.r, showName: this.showNames })}</g>`).join('');
     this.offEls = [...this.gOff.children];
@@ -178,7 +178,7 @@ export class PlayStage {
   setFocus(slot) {
     this.focus = slot || null;
     if (!this.playData) return;
-    this.gRoutes.innerHTML = routesMarkup(this.playData, { faint: !this.focus, focus: this.focus, target: this.sim.target });
+    this.gRoutes.innerHTML = routesMarkup(this.playData, { focus: this.focus, target: this.sim.target });
     this.applyFocus();
   }
 
