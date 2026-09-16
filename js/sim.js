@@ -19,7 +19,12 @@ const MAN_LAG_PRESS = 14; // pressed up he starts closer, so he gives up less
 const ZONE_REACH = 7.5;  // how far a zone defender will come off his area
 const BALL_REACT = 0.45; // how long before a defender reads a throw
 const CONTEST_R = 1.5;   // arriving this close still counts as contesting
-const BREAKAWAY_Y = 22;
+// A play has shown what it is going to show once the ball carrier is clear.
+// Running them to the end zone afterwards is several seconds of watching a kid
+// jog, for information the coach already has — so a run ends once it is past
+// the rush line, and a catch gets a beat to turn upfield and no more.
+const RUN_ON = 0.9;      // seconds a receiver keeps going after the catch
+const CLEAR_R = 5;       // no defender this close: they are gone, not just past
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -239,6 +244,8 @@ export function simulate(play, ctx) {
   let possessionT = 0, possessionKind = 'qb', lastKind = 'snap';
   let throwT = null, catchT = null, rushArrive = null, sep = null, now = t0;
   const hardStop = Math.max(ctx.passClock, 4) + 5;
+  // The rush line: clear of it with nobody near and the play is made.
+  const clearY = Math.max(4, ctx.rushDistance);
 
   const predict = (slot, t) => {
     const i = idx[slot], s = off[i];
@@ -248,7 +255,7 @@ export function simulate(play, ctx) {
   function finish(kind, at, slot) {
     if (result) return;
     result = { kind, t: now, x: at.x, y: at.y, slot, via: lastKind };
-    endT = now + 0.9;
+    endT = now + 0.7;
   }
 
   function launch(kind, fromSlot, toSlot) {
@@ -473,7 +480,10 @@ export function simulate(play, ctx) {
       } else if (t - possessionT > 0.12) {
         if (nd < TAG_R) finish('flag', s, c);
         else if (s.x < 0 || s.x > W) finish('oob', s, c);
-        else if (s.y >= BREAKAWAY_Y) finish('breakaway', s, c);
+        // Past the rush line on a run, or a beat past the catch on a pass.
+        else if (s.y >= clearY || (possessionKind === 'catch' && t - possessionT >= RUN_ON)) {
+          finish(nd >= CLEAR_R ? 'breakaway' : 'gain', s, c);
+        }
       }
     }
     if (snapped && !result && t >= hardStop) finish('none', ball, ball.carrier);
@@ -540,10 +550,13 @@ function describe(r, sim, play, ctx) {
   const base = { kind: r.kind, t: r.t, x: r.x, y: r.y, yards, caught, slot: r.slot };
   const runVerb = r.via === 'pitch' ? 'Pitch' : 'Handoff';
   switch (r.kind) {
+    // 'gain' is the play being called once the carrier is clear, rather than
+    // run out to the end zone — the same outcome, just not filmed to the end.
     case 'flag':
+    case 'gain':
       return caught
-        ? { ...base, tone: gainTone, title: `Complete to ${nameOf(r.slot)} · ${yds}`, detail: `${sepTxt} · caught at ${sim.catchT.toFixed(1)}s` }
-        : { ...base, tone: gainTone, title: `${runVerb} to ${nameOf(r.slot)} · ${yds}`, detail: 'Flag pulled' };
+        ? { ...base, tone: gainTone, title: `Complete to ${nameOf(r.slot)} · ${yds}`, detail: `${sepTxt}${sim.catchT != null ? ` · caught at ${sim.catchT.toFixed(1)}s` : ''}` }
+        : { ...base, tone: gainTone, title: `${runVerb} to ${nameOf(r.slot)} · ${yds}`, detail: r.kind === 'flag' ? 'Flag pulled' : 'Clear of the rush and into space' };
     case 'breakaway':
       return { ...base, tone: 'great', title: caught ? `Complete to ${nameOf(r.slot)} · breakaway!` : `${runVerb} to ${nameOf(r.slot)} · breakaway!`, detail: caught ? sepTxt : 'Nobody could catch them' };
     case 'oob':
