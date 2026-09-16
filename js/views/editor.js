@@ -194,7 +194,7 @@ export function mount(root, playId) {
     }
   }
   function drawOverlays() {
-    gRoutes.innerHTML = routesMarkup(play, { selected: sel });
+    gRoutes.innerHTML = routesMarkup(play);
     let ghosts = '';
     for (const p of play.players) {
       if (!p.motion.length) continue;

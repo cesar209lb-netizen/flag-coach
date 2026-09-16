@@ -84,13 +84,16 @@ function routeEnd(pts) {
 
 // `focus` spotlights one player: their route stays bright and everyone else's
 // drops right back, which is how a player studies their own assignment.
-export function routesMarkup(play, { selected = null, faint = false, badges = true, target = undefined, scale = 1, focus = null } = {}) {
+// Routes are drawn solid. The only thing that ever fades one is the Watch
+// picker spotlighting a single player — everywhere else a route the coach drew
+// is a route the coach can see, whether or not somebody is selected and whether
+// or not the play is running.
+export function routesMarkup(play, { badges = true, target = undefined, scale = 1, focus = null } = {}) {
   const tgt = target === undefined ? passTarget(play) : target;
   let under = '', over = '', marks = '';
   for (const p of play.players) {
     const col = ROUTE_COLORS[p.slot];
-    const dim = focus ? (p.slot === focus || p.slot === 'QB' ? 1 : 0.12)
-      : faint ? 0.4 : selected && selected !== p.slot ? 0.5 : 1;
+    const dim = focus && p.slot !== focus && p.slot !== 'QB' ? 0.12 : 1;
     if (p.motion.length) {
       const d = pathD(absMotion(p));
       under += `<path d="${d}" fill="none" stroke="#06140a" stroke-opacity=".35" stroke-width="${0.46 * scale}" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -107,7 +110,7 @@ export function routesMarkup(play, { selected = null, faint = false, badges = tr
     if (badges && p.read && p.slot !== 'QB') {
       const pts = p.route.length ? absRoute(p) : [{ x: p.x, y: p.y }];
       const b = routeEnd(pts);
-      marks += `<g transform="translate(${f2(b.x)} ${f2(-b.y)})" opacity="${faint ? 0.75 : dim}"><circle r=".78" fill="#0b1016" stroke="${col}" stroke-width=".18"/><text y=".32" font-size=".92" class="badge-t" text-anchor="middle">${p.read}</text></g>`;
+      marks += `<g transform="translate(${f2(b.x)} ${f2(-b.y)})" opacity="${dim}"><circle r=".78" fill="#0b1016" stroke="${col}" stroke-width=".18"/><text y=".32" font-size=".92" class="badge-t" text-anchor="middle">${p.read}</text></g>`;
     }
   }
   return under + over + marks;
