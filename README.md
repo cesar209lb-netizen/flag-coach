@@ -168,6 +168,11 @@ Faded triangles are where the defenders will be when the ball arrives. The lette
 on a defender is who they have in man, the red bubble is a zone, and the curve on
 their shoulder is the side they're shading.
 
+A play stops once it has shown what it is going to show: a run ends when the
+carrier is clear of the rush line, and a catch gets a beat to turn upfield. It
+is not run out to the end zone, which was several seconds of watching a kid jog
+for something you already knew.
+
 Defense tab → **vs every look** simulates the play against all nine alignments at
 once, which is the fastest way to find the one that breaks it.
 
