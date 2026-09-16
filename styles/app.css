@@ -634,12 +634,6 @@ textarea.input { resize: vertical; line-height: 1.45; }
    the bar keeps its height and fitView does not reframe the field mid-play. */
 .huddle.running .hd-bottom { opacity: 0; }
 .huddle.running .hd-bottom button, .huddle.running .hd-bottom .seg { pointer-events: none; }
-/* Says what the field itself can do, until somebody does it. */
-.hd-tip { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 1;
-  background: rgba(6, 20, 10, .78); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  color: #e7f5ea; padding: 7px 15px; border-radius: 999px; font-size: 13px; font-weight: 650;
-  white-space: nowrap; pointer-events: none; }
-.huddle.running .hd-tip { opacity: 0; transition: opacity .25s ease; }
 .hd-title { font-size: 30px; font-weight: 850; line-height: 1.05; text-shadow: 0 2px 8px rgba(0, 0, 0, .55); }
 .hd-sub { color: #bfe0c8; font-weight: 650; text-shadow: 0 1px 6px rgba(0, 0, 0, .55); }
 .hd-counter { font-family: var(--round); font-weight: 800; color: #cfe3d4; font-size: 18px; }

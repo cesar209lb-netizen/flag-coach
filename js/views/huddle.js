@@ -61,8 +61,7 @@ export function openHuddle(playIds, startIndex = 0) {
     { iconName: 'flip', kind: 'ghost', cls: 'hd-flip', title: 'Show the play run to the other side' });
   const focusWrap = h('div', { class: 'hd-focus' });
 
-  const tip = h('div', { class: 'hd-tip' }, 'Tap a receiver to send them the ball');
-  const fieldBox = h('div', { class: 'hd-field' }, svg, tip, result);
+  const fieldBox = h('div', { class: 'hd-field' }, svg, result);
   const topBar = h('header', { class: 'hd-top' },
     h('div', { class: 'hd-heading' }, title, sub, notes),
     h('div', { class: 'spacer' }),
@@ -192,8 +191,6 @@ export function openHuddle(playIds, startIndex = 0) {
       aimed ? `ball to ${focusLabel}` : null,
     ].filter(Boolean).join(' · ');
     counter.textContent = ids.length > 1 ? `${index + 1} / ${ids.length}` : '';
-    // The hint is only worth the space until somebody has used it.
-    tip.hidden = !!focus || !shown.ball.some((b) => b.type === 'pass');
     notes.textContent = play.notes || '';
     prevBtn.disabled = index === 0;
     nextBtn.disabled = index === ids.length - 1;
@@ -213,32 +210,15 @@ export function openHuddle(playIds, startIndex = 0) {
     load();
   }
 
-  // Tap a receiver to send them the ball: the quickest way to show a kid what
-  // the play looks like coming to them. Same thing the Watch picker does, put
-  // on the player instead of a row of letters. Tapping them again puts it back.
-  function tapPlayer(slot) {
-    if (!slot || slot === 'QB') return false;
-    focus = focus === slot ? '' : slot;
-    prefFocus.set(focus);
-    stage.focus = focus || null;
-    renderControls();
-    load();
-    return true;
-  }
-
-  // Swipe left/right to change plays, tap a player to aim at them, tap the
-  // grass to pause.
+  // Swipe left/right to change plays, tap to pause.
   let down = null;
-  svg.addEventListener('pointerdown', (e) => {
-    down = { x: e.clientX, y: e.clientY, id: e.pointerId, slot: e.target.closest?.('g[data-slot]')?.dataset.slot || null };
-  });
+  svg.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
   svg.addEventListener('pointerup', (e) => {
     if (!down || down.id !== e.pointerId) return;
     const dx = e.clientX - down.x, dy = e.clientY - down.y;
-    const slot = down.slot;
     down = null;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
-    else if (Math.hypot(dx, dy) < 12) { if (!tapPlayer(slot)) stage.toggle(); }
+    else if (Math.hypot(dx, dy) < 10) stage.toggle();
   });
 
   const onKey = (e) => {
