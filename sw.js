@@ -1,7 +1,7 @@
 // Offline support: cache every app file on install, serve from cache first.
 // Bump CACHE whenever any app file changes so iPads pick up the new version.
 
-const CACHE = 'flagcoach-v31';
+const CACHE = 'flagcoach-v32';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './styles/app.css',
   './js/app.js', './js/ui.js', './js/db.js', './js/store.js', './js/model.js', './js/field.js',

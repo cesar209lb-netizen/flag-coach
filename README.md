@@ -219,9 +219,11 @@ per position, with the empty ones drawn, because five is the whole game. Tap it
 and the picker opens: five position cards across the top (QB, C, X, Y, Z, in the
 playbook's own colours) and the squad underneath. Tap a player to drop them into
 the spot you picked, or the first empty one; drag them onto a spot; or tap a
-spot to send that player back. The squad is ordered **least playing time
-first**, so the kid owed a turn is the one you see, and Done will not let you
-leave with anything other than five.
+spot to send that player back. The squad splits in two: **Ready**, ordered least
+playing time first so the kid owed a turn is the one you see, and **Just played
+· last snap** in yellow underneath — whoever was out there for the play you just
+logged, so nobody goes straight back in by accident. Done will not let you leave
+with anything other than five.
 
 Because the app knows who is playing X today, **Ball to** names the kid rather
 than the letter, and the log reads "to Mateo". Every snap records its own copy

@@ -273,9 +273,15 @@ function lineupSheet(game) {
     h('div', { class: 'gd-card-name' }, r ? r.player.first : 'Empty'));
   };
 
+  // Who was on the field for the most recent snap. Coming off, they land in
+  // their own yellow group, so nobody goes straight back in by accident.
+  const lastSnap = (game.log || [])[(game.log || []).length - 1];
+  const justPlayed = new Set(lastSnap?.onField || []);
+
   const benchCard = ({ player, entry, snaps, pct }) => {
+    const fresh = justPlayed.has(player.id);
     const card = h('button', {
-      class: 'gd-card bench',
+      class: `gd-card bench ${fresh ? 'just' : ''}`,
       dataset: { player: player.id },
       onclick: () => {
         const slot = aim || firstEmpty();
@@ -285,7 +291,8 @@ function lineupSheet(game) {
     },
     h('div', { class: 'gd-card-photo' },
       player.photo ? h('img', { src: player.photo, alt: '', draggable: 'false' }) : h('span', { class: 'gd-card-initials' }, initials(player)),
-      entry.number ? h('span', { class: 'gd-card-num' }, `#${entry.number}`) : null),
+      entry.number ? h('span', { class: 'gd-card-num' }, `#${entry.number}`) : null,
+      fresh ? h('span', { class: 'gd-card-just' }, 'Just played') : null),
     h('div', { class: 'gd-card-name' }, player.first),
     h('div', { class: 'gd-card-time' },
       h('span', null, `${snaps} snap${snaps === 1 ? '' : 's'}`),
@@ -346,15 +353,29 @@ function lineupSheet(game) {
     const { rows, total } = snapRows(game, roster);
     const onIds = spotIds(spots);
     const off = rows.filter((r) => !onIds.includes(r.player.id));
+    const fresh = off.filter((r) => justPlayed.has(r.player.id));
+    const rested = off.filter((r) => !justPlayed.has(r.player.id));
     if (doneBtn) doneBtn.disabled = onIds.length !== ON_FIELD;
-    body.replaceChildren(
+    // replaceChildren turns a null into the text "null", unlike h(), so the
+    // list is filtered before it goes in.
+    body.replaceChildren(...[
       h('div', { class: `gd-fieldcount ${onIds.length === ON_FIELD ? 'ok' : ''}` },
         h('b', null, `${onIds.length} of ${ON_FIELD} positions filled`),
         h('span', { class: 'muted small' }, aim ? `Tap a player to put them at ${aim}`
           : total ? `${total} snaps logged so far` : 'Tap a player, or drag them onto a spot')),
       h('div', { class: 'gd-spots' }, ...SLOTS.map(spotCard)),
-      h('div', { class: 'section-label' }, off.length ? 'Squad — least playing time first' : 'Everybody is in'),
-      off.length ? h('div', { class: 'gd-cards' }, ...off.map(benchCard)) : null);
+      // Rested first, because they are who you are reaching for; whoever just
+      // came off sits underneath in yellow.
+      ...(rested.length ? [
+        h('div', { class: 'section-label' }, 'Ready — least playing time first'),
+        h('div', { class: 'gd-cards' }, ...rested.map(benchCard)),
+      ] : []),
+      ...(fresh.length ? [
+        h('div', { class: 'section-label just' }, 'Just played · last snap'),
+        h('div', { class: 'gd-cards' }, ...fresh.map(benchCard)),
+      ] : []),
+      off.length ? null : h('p', { class: 'p-help' }, 'Everybody is in.'),
+    ].filter(Boolean));
   };
   draw();
 
@@ -660,23 +681,38 @@ function build() {
 }
 
 function gameListSheet() {
-  const games = gamesForSeason();
-  openSheet({
+  // The list redraws itself: rerender() rebuilds the page behind the sheet, so
+  // a deleted game used to sit here looking undeleted until the sheet closed.
+  const list = h('div', { class: 'check-list' });
+  let sheet = null;
+
+  const row = (g) => h('div', { class: 'check-row' },
+    h('button', {
+      class: 'grow gd-game-row',
+      onclick: () => { currentId = g.id; pending = null; sheet?.close(); rerender(); },
+    },
+    h('b', null, g.opponent || 'Game'),
+    h('span', { class: 'muted small' }, ` ${new Date(g.date).toLocaleDateString()} · ${g.us}–${g.them} · ${(g.log || []).length} plays`)),
+    iconBtn('trash', async () => {
+      if (!(await confirmDialog({ title: `Delete ${g.opponent || 'this game'}?`, message: 'The score and every play logged in it are removed. This cannot be undone.', confirmText: 'Delete', danger: true }))) return;
+      await deleteGame(g.id);
+      if (currentId === g.id) currentId = null;
+      rerender();
+      draw();
+    }, { title: 'Delete game', cls: 'small' }));
+
+  function draw() {
+    const games = gamesForSeason();
+    // Nothing left to pick from, so there is nothing for the sheet to be.
+    if (!games.length) { sheet?.close(); return; }
+    list.replaceChildren(...games.map(row));
+  }
+
+  sheet = openSheet({
     title: 'Games',
     size: 'md',
-    body: h('div', { class: 'check-list' }, ...games.map((g) => h('div', { class: 'check-row' },
-      h('button', {
-        class: 'grow gd-game-row',
-        onclick: () => { currentId = g.id; pending = null; rerender(); },
-      },
-      h('b', null, g.opponent || 'Game'),
-      h('span', { class: 'muted small' }, ` ${new Date(g.date).toLocaleDateString()} · ${g.us}–${g.them} · ${(g.log || []).length} plays`)),
-      iconBtn('trash', async () => {
-        if (!(await confirmDialog({ title: `Delete ${g.opponent || 'this game'}?`, message: 'The score and every play logged in it are removed. This cannot be undone.', confirmText: 'Delete', danger: true }))) return;
-        await deleteGame(g.id);
-        if (currentId === g.id) currentId = null;
-        rerender();
-      }, { title: 'Delete game', cls: 'small' })))),
+    body: list,
     actions: [{ label: 'Done', kind: 'primary' }],
   });
+  draw();
 }
