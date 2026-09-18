@@ -333,9 +333,10 @@ export const ROUTES = [
   { id: 'wheel', name: 'Wheel', pts: [[4, 1], [6, 4], [6, 18]] },
   { id: 'sluggo', name: 'Slant & Go', pts: [[0, 3], [-2, 5], [-2, 19]] },
   { id: 'outup', name: 'Out & Up', pts: [[0, 5], [3, 5], [3.5, 19]] },
-  // Stem, a jab step inside, then hard back out to the sideline and flat. The
-  // defender who leans in on the jab is going the wrong way when it breaks.
-  { id: 'zig', name: 'Zig', pts: [[0, 4.5], [-2, 6], [6, 4.5]] },
+  // Stem, a jab step inside, then hard back out to the sideline — flat, holding
+  // the depth it broke at. The defender who leans in on the jab is going the
+  // wrong way when it breaks.
+  { id: 'zig', name: 'Zig', pts: [[0, 4.5], [-2, 6], [6, 6]] },
   { id: 'cross', name: 'Deep Cross', pts: [[0, 6], [-14, 11]] },
   { id: 'arrow', name: 'Arrow', pts: [[5, 4]] },
   { id: 'swing', name: 'Swing', pts: [[3, -1], [6, -0.5], [8, 2]] },
