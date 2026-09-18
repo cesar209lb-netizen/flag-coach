@@ -805,33 +805,12 @@ textarea.input { resize: vertical; line-height: 1.45; }
   letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gd-score { font-family: var(--round); font-size: 54px; font-weight: 850; line-height: 1.05; }
 .gd-dd { text-align: center; }
-.gd-dd-main { display: flex; flex-direction: column; gap: 2px; padding: 6px 14px; border-radius: 12px; background: var(--bg2); }
-.gd-down { font-size: 26px; font-weight: 850; }
-.gd-togo { font-weight: 750; font-size: 13px; }
-.gd-togo.mid { color: var(--warn); }
-.gd-togo.score { color: #86efac; }
-.gd-log-first { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 7px;
-  background: rgba(34, 197, 94, .18); color: #86efac; }
 .gd-callrow { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
-.btn.big, .gd-buttons .btn { min-height: 54px; font-size: 16px; font-weight: 750; }
-.gd-result { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
-.gd-pending { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.gd-yards { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
-.gd-yard-val { font-family: var(--round); font-size: 22px; font-weight: 800; min-width: 84px; text-align: center; }
-.gd-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.btn.big { min-height: 54px; font-size: 16px; font-weight: 750; }
 .tone-great, .tone-good { background: rgba(34, 197, 94, .16); color: #86efac; }
 .tone-warn { background: rgba(250, 204, 21, .16); color: #fde68a; }
 .tone-bad { background: rgba(239, 68, 68, .16); color: #fca5a5; }
-.gd-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 8px; }
-.gd-summary > div { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
-.gd-summary b { display: block; font-family: var(--round); font-size: 24px; font-weight: 850; }
-.gd-summary small { color: var(--muted); font-size: 12px; }
-.gd-log { display: flex; flex-direction: column; gap: 4px; }
-.gd-log-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--card);
-  border: 1px solid var(--line); border-radius: 10px; }
-.gd-log-dd { color: var(--muted); font-size: 12px; font-weight: 700; min-width: 78px; }
-.gd-log-res { font-family: var(--round); font-weight: 800; padding: 2px 8px; border-radius: 8px; }
-/* Who is on the field: a tap-target strip of faces above the play caller. */
+/* Who is on the field: a tap-target strip of faces above the Play ran button. */
 .gd-lineup { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
   background: var(--card); border: 1px solid var(--line); border-radius: 14px;
   padding: 10px 12px; margin-bottom: 12px; min-height: 60px; }
@@ -924,27 +903,7 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .gd-card-time { color: var(--muted); font-size: 11px; font-weight: 650; }
 .gd-card-time .gd-bar { margin-top: 4px; }
 
-/* Calling a play: formations, then the plays, drawn — the playbook's order. */
-.gd-call { margin-top: 4px; }
-.gd-playgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-.gd-playcard { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); text-align: left; }
-.gd-playcard:active { border-color: var(--accent); opacity: .9; }
-.gd-playcard-body { padding: 9px 11px 11px; }
-.gd-playcard-name { font-weight: 750; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* The called play, waiting on what it did. */
-.gd-called { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-.gd-called-thumb { width: 92px; aspect-ratio: 31 / 24; border-radius: 10px; overflow: hidden; background: #1a5424; flex: none; }
-.gd-called-thumb svg { display: block; width: 100%; height: 100%; }
-.gd-called-main { flex: 1 1 120px; min-width: 0; }
-.gd-called-name { font-size: 20px; font-weight: 800; line-height: 1.15; }
-.gd-called-acts { display: flex; gap: 8px; margin-left: auto; }
-.gd-to { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.gd-to-label { color: var(--muted); font-size: 13px; font-weight: 650; }
-.gd-to-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-
-/* Playing time, in the only unit a flag game has. */
-.gd-tabs { margin: 14px 0 10px; }
+/* Playing time: minutes off the game clock, with the snap count beside them. */
 .gd-time { display: flex; flex-direction: column; gap: 6px; }
 .gd-time-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; background: var(--card);
   border: 1px solid var(--line); border-radius: 12px; }
@@ -952,7 +911,8 @@ textarea.input { resize: vertical; line-height: 1.45; }
 .gd-time-name { font-weight: 700; margin-bottom: 5px; }
 .gd-bar { height: 6px; border-radius: 999px; background: var(--bg2); overflow: hidden; }
 .gd-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
-.gd-time-num { font-family: var(--round); font-weight: 850; font-size: 19px; text-align: right; min-width: 52px; }
+.gd-time-num { font-family: var(--round); font-weight: 850; font-size: 19px; text-align: right; min-width: 64px; }
+.gd-time-num b { font-variant-numeric: tabular-nums; }
 .gd-time-num small { display: block; color: var(--muted); font-size: 11px; font-weight: 700; }
 
 .gd-picklist { display: flex; flex-direction: column; gap: 6px; }

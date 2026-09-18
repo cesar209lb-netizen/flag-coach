@@ -167,6 +167,13 @@ export async function loadState() {
   // it. Tags are only ever added in the app, never removed, so folding the
   // defaults back in can't resurrect anything a coach got rid of.
   state.settings.tags = [...DEFAULT_TAGS, ...state.settings.tags.filter((t) => !DEFAULT_TAGS.includes(t))];
+  // Halves are 25 minutes now. A playbook started before that has the old 20
+  // saved, so it gets moved once — the half length is still a tap away in the
+  // clock sheet if a league plays something else.
+  if (!state.settings.halfMinutesV2) {
+    state.settings.halfMinutes = 25;
+    state.settings.halfMinutesV2 = true;
+  }
   state.players = await stripPersonalFields(players);
   state.seasons = seasons.sort((a, b) => a.createdAt - b.createdAt);
   state.plays = plays;
