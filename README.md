@@ -2,9 +2,10 @@
 
 A 5v5 flag football coaching app, built for a coach's iPad but usable from any
 phone, tablet or computer: playbook with a route designer and play animation,
-roster with photos, huddle mode, and backups. Plain HTML/CSS/JavaScript — no
-build step, no accounts. Data lives on the device (IndexedDB), and the app keeps
-working with no signal once installed — which matters on a field on game day.
+roster with photos, huddle mode, a game-day clock that counts every kid's
+playing time, and backups. Plain HTML/CSS/JavaScript — no build step, no
+accounts. Data lives on the device (IndexedDB), and the app keeps working with
+no signal once installed — which matters on a field on game day.
 Optional team sync shares one playbook across every paired device, and hands
 players a read-only copy, through a free store you own.
 
@@ -190,58 +191,42 @@ the app's greens comes out of a printer as a page of solid ink.
 
 ## Game day
 
-The **Game** tab keeps score and records what you called, built for a coach
-holding a tablet with eight seconds to the next snap.
+The **Game** tab does two things: keep score, and keep every kid's playing time.
+That is all it does on purpose. Calling plays from the playbook used to live
+here — formation, play, who got the ball, what it did — and on a sideline with
+eight seconds to the next snap that is four taps nobody has time for, so it is
+gone.
 
-**Calling a play** is formation first and then the play, drawn — the same order
-the playbook is in, so what you want is where you already know it is. Plays you
-have already called this game sit at the top as **Called already**, because a
-second helping should be one tap. Search jumps past both.
+**Playing time is counted two ways.** *Time* is minutes off the game clock:
+whoever is on the field while the clock runs is on the meter, and the numbers
+tick up in front of you. *Plays* is snaps, counted by one tap on **Play ran** —
+no play name, no result, just who was out there. Both sit on the same row per
+player, fewest time first, so the kid owed a turn is the one at the top.
+**Undo** takes back a mistaken tap.
 
-**Once it is called** you get the diagram, the down, and **Show team** — the
-same full-screen Huddle mode with its animation, Watch picker and Flip. **Ball
-to** is filled in from the play itself (whoever the throw is aimed at, or
-whoever takes the last handoff), so a play that goes as drawn needs no tap at
-all; tap a different spot when it does not. Then Touchdown, Gain, No gain, Loss
-or Turnover and the snap is logged. **Undo last** fixes a wrong tap.
+**The clock** is the middle of the scoreboard. Tap ▶ to run it, tap the time to
+set the half length (25 minutes by default) or start the next half. It is stored
+as "time left when it last stopped" plus "when it started running", so closing
+the app and coming back does not lose a second of it — and neither does anyone's
+playing time, which is banked the same way: what a player is owed goes in the
+bank whenever the clock stops, the lineup changes or the half ends. A half that
+runs out while the app is closed stops the meter at the moment it expired, not
+whenever you look again.
 
-**Downs are flag downs.** There are no chains: four plays to cross midfield,
-and crossing buys four more to score. So the board reads `1st down · to
-midfield` and then `1st down · to score`, and the one first down a series has
-is its own button — **Crossed midfield** — because the app has no way to know
-where the ball is and a coach on a sideline is not counting yards to a stake.
-Four and out, a score or a turnover starts the next series back at midfield.
-Tap the down block to correct any of it.
-
-**The clock** sits in the middle of the board with the down. Tap ▶ to run it,
-tap the time to set the half length or start the next half. It is stored as
-"time left when it last stopped" plus "when it started running", so closing the
-app and coming back does not lose a second of it.
-
-**Who is on the field** is the strip of faces above the play caller — one slot
-per position, with the empty ones drawn, because five is the whole game. Tap it
-and the picker opens: five position cards across the top (QB, C, X, Y, Z, in the
+**Who is on the field** is the strip of faces above the button — one slot per
+position, with the empty ones drawn, because five is the whole game. Tap it and
+the picker opens: five position cards across the top (QB, C, X, Y, Z, in the
 playbook's own colours) and the squad underneath. Tap a player to drop them into
 the spot you picked, or the first empty one; drag them onto a spot; or tap a
 spot to send that player back. The squad splits in two: **Ready**, ordered least
-playing time first so the kid owed a turn is the one you see, and **Just played
-· last snap** in yellow underneath — whoever was out there for the play you just
-logged, so nobody goes straight back in by accident. Done will not let you leave
-with anything other than five.
+playing time first, and **Just played · last snap** in yellow underneath, so
+nobody goes straight back in by accident. Done will not let you leave with
+anything other than five. Substituting banks what the five coming off are owed
+before the new five start the meter, and every snap records its own copy of the
+lineup, so a change mid-drive does not rewrite who played the plays before it.
 
-Because the app knows who is playing X today, **Ball to** names the kid rather
-than the letter, and the log reads "to Mateo". Every snap records its own copy
-of the lineup, so substituting mid-drive does not rewrite who played the plays
-before it.
-
-**Playing time** is the other tab under the summary: snaps and share of the
-game per player, fewest first, with whoever is currently on the field outlined.
-Snaps are the unit a flag game actually has — nobody is timing a stopwatch on
-the sideline.
-
-Those results come back to the playbook: a play carries its real average and
-touchdown count next to its rating, so you can see whether the thing that works
-in the simulation works against people.
+**The score** is +6, +1, +2 and −1 under each side, for you and for them. Tap
+the header to name the opponent.
 
 Games sync between coaches and ride along in backups. Player devices never
 receive them.

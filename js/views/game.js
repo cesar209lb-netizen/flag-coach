@@ -1,34 +1,23 @@
-// Game day: the sideline screen. Score, down and distance, who is on the field,
-// and a log of every play called with what it actually did.
+// Game day: the sideline screen. The clock, the score, who is on the field, and
+// how long each of them has played.
 //
-// Built for a coach holding a tablet in one hand with eight seconds before the
-// next snap. Calling a play is formation first and then the play, drawn, the
-// same way the playbook is organised — so the thing you are looking for is
-// where you already know it is. Recording what happened is one tap on a big
-// button, with who got the ball filled in from the play itself.
-//
-// Everything it records feeds back into the playbook: a play's real average
-// sits next to the simulated one, which is the only way to find out whether the
-// thing that works on paper works against people.
+// It used to carry the whole play-by-play — pick a formation, pick the play,
+// say who got the ball, say what it did. On a sideline with eight seconds to
+// the next snap that is four taps nobody has time for, so it is gone. What is
+// left is the thing a coach actually has to get right: every kid gets their
+// minutes. Time runs off the game clock for whoever is on the field, and a play
+// is one tap on **Play ran**.
 
 import { h, icon, iconBtn, btn, segmented, openSheet, confirmDialog, promptDialog, toast, initials } from '../ui.js';
-import { state, subscribe, activeSeason, saveGame, saveSettings, deleteGame, gameById, playById, rosterFor } from '../store.js';
+import { state, subscribe, activeSeason, saveGame, saveSettings, deleteGame, gameById, rosterFor } from '../store.js';
 import {
-  newGame, PLAY_RESULTS, PHASES, ON_FIELD, SLOTS, SLOT_COLORS, SLOT_TEXT, phaseOf, nextDown,
+  newGame, ON_FIELD, SLOTS, SLOT_COLORS, SLOT_TEXT,
   newClock, clockLeft, clockRunning, clockText, fieldSpots, spotIds,
-  playStats, uid, formationGroups, formationSample, isPassPlay, ballEndsWith, snapRows,
+  uid, snapRows, bankTime, playedMs,
 } from '../model.js';
-import { playThumb } from '../field.js';
-import { openHuddle } from './huddle.js';
 
-// Which game is on screen, and the play waiting for its result.
+// Which game is on screen.
 let currentId = null;
-let pending = null;
-let gainYards = 5;
-let tab = 'log';
-// The formation the play caller is showing. Kept between calls: a coach often
-// runs two or three out of the same look before moving on.
-let callFormation = null;
 
 let rerenderFn = null;
 const rerender = () => rerenderFn?.();
@@ -38,15 +27,17 @@ export function mount(root) {
   rerenderFn = render;
   render();
   const unsub = subscribe(render);
-  // The clock redraws itself in place. Re-rendering the whole screen once a
-  // second would throw away scroll position and any half-finished tap.
+  // The clock and the playing-time rows redraw themselves in place. Re-rendering
+  // the whole screen once a second would throw away scroll position and any
+  // half-finished tap.
   const timer = setInterval(() => tickClock(root), 250);
   return { destroy: () => { rerenderFn = null; clearInterval(timer); unsub(); } };
 }
 
 // ---------- Clock ----------
 
-const clockOf = (game) => game.clock || newClock(state.settings.halfMinutes || 20);
+const halfLength = () => state.settings.halfMinutes || 25;
+const clockOf = (game) => game.clock || newClock(halfLength());
 
 function tickClock(root) {
   const game = current();
@@ -59,20 +50,38 @@ function tickClock(root) {
     el.classList.toggle('low', left <= 60000 && left > 0);
     el.classList.toggle('done', left === 0);
   }
-  // Ran out while nobody was looking: stop it once, and say so.
+  tickTime(root, game);
+  // Ran out while nobody was looking: bank the time, stop it once, and say so.
   if (c.since && clockLeft(c) === 0) {
-    saveGame({ ...game, clock: { ...c, ms: 0, since: null } });
+    saveGame({ ...bankTime(game), clock: { ...c, ms: 0, since: null } });
     toast(`End of half ${c.half}`, { tone: 'warn', duration: 6000 });
   }
 }
 
+// The minutes tick up while the clock runs, so they are patched in place too.
+function tickTime(root, game) {
+  const rows = [...root.querySelectorAll('.gd-time-row[data-player]')];
+  if (!rows.length) return;
+  const vals = rows.map((el) => playedMs(game, el.dataset.player));
+  const most = Math.max(0, ...vals);
+  rows.forEach((el, i) => {
+    const num = el.querySelector('.gd-time-clock');
+    if (num) num.textContent = clockText(vals[i]);
+    const bar = el.querySelector('.gd-bar i');
+    if (bar) bar.style.width = `${most ? Math.round((vals[i] / most) * 100) : 0}%`;
+  });
+}
+
+// Starting and stopping the clock is also starting and stopping everybody's
+// playing time, so what is owed goes in the bank on the way past.
 async function toggleClock(game) {
   const c = clockOf(game);
   if (clockRunning(c)) {
-    await saveGame({ ...game, clock: { ...c, ms: clockLeft(c), since: null } });
+    await saveGame({ ...bankTime(game), clock: { ...c, ms: clockLeft(c), since: null } });
   } else {
     if (clockLeft(c) === 0) return;
-    await saveGame({ ...game, clock: { ...c, since: Date.now() } });
+    const now = Date.now();
+    await saveGame({ ...game, clock: { ...c, since: now }, timeSince: now });
   }
   rerender();
 }
@@ -80,19 +89,19 @@ async function toggleClock(game) {
 function clockSheet(game) {
   const c = clockOf(game);
   const body = h('div');
-  let minutes = c.minutes || state.settings.halfMinutes || 20;
+  let minutes = c.minutes || halfLength();
   const draw = () => body.replaceChildren(
     h('div', { class: 'field-label' }, 'Half length',
-      segmented([10, 15, 20, 25].map((n) => ({ value: n, label: `${n} min` })), minutes, (v) => { minutes = v; draw(); })),
-    h('p', { class: 'p-help' }, 'Starting the next half puts the clock back to full and counts the half up. Restarting this one just puts the time back.'),
+      segmented([15, 20, 25, 30].map((n) => ({ value: n, label: `${n} min` })), minutes, (v) => { minutes = v; draw(); })),
+    h('p', { class: 'p-help' }, 'Starting the next half puts the clock back to full and counts the half up. Restarting this one just puts the time back. Playing time already banked is kept either way.'),
     h('div', { class: 'btn-row' },
       btn(`Start half ${c.half + 1}`, async () => {
-        await saveGame({ ...game, clock: { half: c.half + 1, minutes, ms: minutes * 60000, since: null } });
+        await saveGame({ ...bankTime(game), clock: { half: c.half + 1, minutes, ms: minutes * 60000, since: null } });
         rerender();
         toast(`Half ${c.half + 1} — clock reset`);
       }, { kind: 'primary', iconName: 'next' }),
       btn('Restart this half', async () => {
-        await saveGame({ ...game, clock: { ...c, minutes, ms: minutes * 60000, since: null } });
+        await saveGame({ ...bankTime(game), clock: { ...c, minutes, ms: minutes * 60000, since: null } });
         rerender();
       }, { kind: 'ghost', iconName: 'restart' })));
   draw();
@@ -104,8 +113,8 @@ function clockSheet(game) {
   });
 }
 
-// The clock lives in the middle of the board with the down, the way a real
-// scoreboard reads — and a row of its own was the row the result buttons needed.
+// The clock is the middle of the board now, where the down used to sit: it is
+// what the whole screen is counting.
 function clockBar(game) {
   const c = clockOf(game);
   const left = clockLeft(c);
@@ -132,23 +141,22 @@ function current() {
   return (currentId && gameById(currentId)) || list[0] || null;
 }
 
-const ORD = ['1st', '2nd', '3rd', '4th'];
-const ordinal = (d) => ORD[Math.min(d, 4) - 1] || `${d}th`;
-
 // Starts straight away rather than asking for an opponent first: a prompt
 // cannot tell "cancelled" from "left blank", and nobody wants a dialog between
 // them and the first snap. The name is set afterwards by tapping the header.
 async function startGame() {
   const season = activeSeason();
-  const g = newGame(season?.id || null, '', state.settings.halfMinutes || 20);
+  const g = newGame(season?.id || null, '', halfLength());
   // Carry the last game's lineup over — it is usually the same five kids, and
   // an empty field on the first snap is a worse default than a stale one.
   const prev = gamesForSeason()[0];
   const roster = rosterFor();
-  if (prev?.onField?.length) g.onField = prev.onField.filter((id) => roster.some((r) => r.player.id === id));
+  if (prev?.onField?.length) {
+    g.onField = prev.onField.filter((id) => roster.some((r) => r.player.id === id));
+    g.spots = Object.fromEntries(Object.entries(prev.spots || {}).filter(([, id]) => g.onField.includes(id)));
+  }
   await saveGame(g);
   currentId = g.id;
-  pending = null;
   rerender();
 }
 
@@ -159,40 +167,29 @@ async function renameGame(game) {
   rerender();
 }
 
-// ---------- Recording ----------
+// ---------- Recording a snap ----------
 
-async function record(game, result, yards, crossed = false) {
-  const play = pending?.id ? playById(pending.id) : null;
+// One tap. All it writes down is who was out there, which is all the playing
+// time count needs.
+async function playRan(game) {
+  if (!(game.onField || []).length) {
+    toast('Pick who is on the field first');
+    lineupSheet(game);
+    return;
+  }
   const entry = {
-    id: uid(), playId: pending?.id || null, playName: pending?.name || 'Play',
-    // Who got it, as a slot, plus the roster id if somebody is assigned there —
-    // the slot survives a roster change, the id is what playing time counts.
-    to: pending?.to || null,
-    toName: pending?.to ? carrierLabel(play, pending.to, game) : null,
-    // The kid at that position when the snap happened, so the log survives a
-    // substitution later in the drive.
-    toPlayerId: (pending?.to && game.spots?.[pending.to]) || null,
+    id: uid(), at: Date.now(),
     onField: [...(game.onField || [])],
     spots: { ...(game.spots || {}) },
-    down: game.down, phase: phaseOf(game), crossed: crossed || undefined,
-    result, yards, at: Date.now(),
   };
-  const g = { ...game, log: [...(game.log || []), entry], ...nextDown(game, result, crossed) };
-  if (result === 'td') g.us += 6;
-  pending = null;
-  await saveGame(g);
+  await saveGame({ ...game, log: [...(game.log || []), entry] });
   rerender();
 }
 
 async function undoLast(game) {
   const log = game.log || [];
   if (!log.length) return;
-  const last = log[log.length - 1];
-  // Put the down back exactly as it was when that play was called.
-  const g = { ...game, log: log.slice(0, -1), down: last.down, phase: last.phase || phaseOf(game) };
-  if (last.toGo != null) g.toGo = last.toGo;
-  if (last.result === 'td') g.us = Math.max(0, g.us - 6);
-  await saveGame(g);
+  await saveGame({ ...game, log: log.slice(0, -1) });
   toast('Last play removed');
   rerender();
 }
@@ -278,7 +275,7 @@ function lineupSheet(game) {
   const lastSnap = (game.log || [])[(game.log || []).length - 1];
   const justPlayed = new Set(lastSnap?.onField || []);
 
-  const benchCard = ({ player, entry, snaps, pct }) => {
+  const benchCard = ({ player, entry, snaps, ms, timePct }) => {
     const fresh = justPlayed.has(player.id);
     const card = h('button', {
       class: `gd-card bench ${fresh ? 'just' : ''}`,
@@ -295,8 +292,8 @@ function lineupSheet(game) {
       fresh ? h('span', { class: 'gd-card-just' }, 'Just played') : null),
     h('div', { class: 'gd-card-name' }, player.first),
     h('div', { class: 'gd-card-time' },
-      h('span', null, `${snaps} snap${snaps === 1 ? '' : 's'}`),
-      h('div', { class: 'gd-bar' }, h('i', { style: { width: `${pct}%` } }))));
+      h('span', null, `${clockText(ms)} · ${snaps} play${snaps === 1 ? '' : 's'}`),
+      h('div', { class: 'gd-bar' }, h('i', { style: { width: `${timePct}%` } }))));
     dragFrom(card, player.id);
     return card;
   };
@@ -362,7 +359,7 @@ function lineupSheet(game) {
       h('div', { class: `gd-fieldcount ${onIds.length === ON_FIELD ? 'ok' : ''}` },
         h('b', null, `${onIds.length} of ${ON_FIELD} positions filled`),
         h('span', { class: 'muted small' }, aim ? `Tap a player to put them at ${aim}`
-          : total ? `${total} snaps logged so far` : 'Tap a player, or drag them onto a spot')),
+          : total ? `${total} play${total === 1 ? '' : 's'} run so far` : 'Tap a player, or drag them onto a spot')),
       h('div', { class: 'gd-spots' }, ...SLOTS.map(spotCard)),
       // Rested first, because they are who you are reaching for; whoever just
       // came off sits underneath in yellow.
@@ -391,7 +388,11 @@ function lineupSheet(game) {
         onClick: async () => {
           const ids = spotIds(spots);
           if (ids.length !== ON_FIELD) return false;
-          await saveGame({ ...game, spots, onField: ids });
+          // Bank what the five leaving the field are owed before the new five
+          // start the meter, otherwise a substitution would pay the wrong kids.
+          const banked = bankTime(game);
+          const running = clockRunning(banked.clock);
+          await saveGame({ ...banked, spots, onField: ids, timeSince: running ? Date.now() : null });
           rerender();
         },
       },
@@ -399,143 +400,6 @@ function lineupSheet(game) {
   });
   doneBtn = sheet.panel.querySelector('.sheet-foot .btn.primary');
   if (doneBtn) doneBtn.disabled = spotIds(spots).length !== ON_FIELD;
-}
-
-// ---------- Calling a play ----------
-
-// What to call whoever is at a spot: the kid playing that position in this game
-// first, then anyone the play itself assigns there, then the position's label.
-function carrierLabel(play, slot, game) {
-  const playing = game?.spots?.[slot] && state.players.find((x) => x.id === game.spots[slot]);
-  if (playing) return playing.first;
-  const p = play?.players.find((q) => q.slot === slot);
-  if (!p) return slot;
-  const assigned = p.assigned && state.players.find((x) => x.id === p.assigned);
-  return assigned ? assigned.first : (p.label || slot);
-}
-
-function callSheet(game) {
-  const W = state.settings.fieldWidth;
-  const groups = formationGroups(state.plays);
-  const search = h('input', { class: 'input search', type: 'search', placeholder: 'Search every play' });
-  const body = h('div', { class: 'gd-call' });
-  const crumb = h('div', { class: 'crumb-row' });
-
-  const call = (play) => {
-    pending = { id: play.id, name: play.name, to: ballEndsWith(play) };
-    sheet.close();
-    rerender();
-  };
-
-  const playCard = (p) => {
-    const st = playStats(state.games, p.id);
-    const pass = isPassPlay(p);
-    return h('button', { class: 'gd-playcard', onclick: () => call(p) },
-      h('div', { class: 'thumb-wrap', html: playThumb(p, W) }),
-      h('div', { class: 'gd-playcard-body' },
-        h('div', { class: 'gd-playcard-name' }, p.name),
-        h('div', { class: 'play-meta' },
-          h('span', { class: `kind-tag ${pass ? 'pass' : 'run'}` }, pass ? 'Pass' : 'Run'),
-          st ? h('span', null, `${st.avg} avg · ${st.calls} called`) : h('span', null, 'Not called yet'))));
-  };
-
-  const draw = () => {
-    const q = search.value.trim().toLowerCase();
-    crumb.replaceChildren();
-    if (q) {
-      const hits = state.plays.filter((p) => `${p.name} ${p.formation} ${p.tags.join(' ')}`.toLowerCase().includes(q));
-      body.replaceChildren(hits.length
-        ? h('div', { class: 'gd-playgrid' }, ...hits.map(playCard))
-        : h('p', { class: 'p-help' }, 'No plays match.'));
-      return;
-    }
-    if (callFormation) {
-      const g = groups.find((x) => x.name === callFormation);
-      if (!g) { callFormation = null; draw(); return; }
-      crumb.replaceChildren(h('button', { class: 'crumb', onclick: () => { callFormation = null; draw(); } },
-        icon('back'), 'All formations'));
-      body.replaceChildren(h('div', { class: 'gd-playgrid' }, ...g.plays.map(playCard)));
-      return;
-    }
-    // Recently called in this game, so a second helping is one tap away.
-    const recent = [...new Map((game.log || []).slice(-6).reverse()
-      .map((e) => [e.playId, e.playId && playById(e.playId)]).filter(([, p]) => p)).values()].slice(0, 4);
-    body.replaceChildren(...[
-      recent.length ? h('div', null,
-        h('div', { class: 'section-label' }, 'Called already'),
-        h('div', { class: 'gd-playgrid' }, ...recent.map(playCard))) : null,
-      groups.length ? h('div', null,
-        recent.length ? h('div', { class: 'section-label' }, 'Formations') : null,
-        h('div', { class: 'formation-grid pick' }, ...groups.map((g) => {
-          const sample = g.id ? formationSample(g.name, W) : g.plays[0];
-          return h('button', { class: 'formation-card pick', onclick: () => { callFormation = g.name; draw(); } },
-            h('div', { class: 'thumb-wrap', html: sample ? playThumb(sample, W) : '' }),
-            h('div', { class: 'formation-body' },
-              h('div', { class: 'formation-name' }, g.name),
-              h('div', { class: 'formation-counts' },
-                h('span', { class: 'fc-pill pass' }, `${g.pass} pass`),
-                h('span', { class: 'fc-pill run' }, `${g.run} run`))));
-        }))) : h('div', { class: 'empty-state' },
-        h('div', { class: 'empty-icon' }, icon('playbook')),
-        h('h3', null, 'No plays yet'),
-        h('p', null, 'Draw a play in the Playbook and it shows up here to call.')),
-    ].filter(Boolean));
-  };
-  search.addEventListener('input', draw);
-  draw();
-
-  const sheet = openSheet({
-    title: `Call a play · ${ordinal(game.down)} ${PHASES[phaseOf(game)]}`,
-    size: 'lg',
-    body: h('div', null,
-      h('div', { class: 'search-wrap pad' }, icon('search'), search),
-      crumb, body),
-  });
-}
-
-// ---------- The called play, and what it did ----------
-
-function pendingCard(game) {
-  const play = pending.id ? playById(pending.id) : null;
-  const W = state.settings.fieldWidth;
-  const slots = (play?.players || []).map((p) => p.slot);
-
-  const yardRow = h('div', { class: 'gd-yards' },
-    iconBtn('back', () => { gainYards = Math.max(0, gainYards - 1); rerender(); }, { title: 'Fewer yards', cls: 'big' }),
-    h('span', { class: 'gd-yard-val' }, `${gainYards} yd`),
-    iconBtn('next', () => { gainYards += 1; rerender(); }, { title: 'More yards', cls: 'big' }));
-
-  return h('div', { class: 'gd-result' },
-    h('div', { class: 'gd-called' },
-      play ? h('div', { class: 'gd-called-thumb', html: playThumb(play, W) }) : null,
-      h('div', { class: 'gd-called-main' },
-        h('div', { class: 'gd-called-name' }, pending.name),
-        h('div', { class: 'muted small' }, [play?.formation, `${ordinal(game.down)} ${PHASES[phaseOf(game)]}`].filter(Boolean).join(' · '))),
-      // Kept together so they wrap as one block rather than one at a time.
-      h('div', { class: 'gd-called-acts' },
-        play ? btn('Show team', () => openHuddle([play.id], 0), { iconName: 'expand', kind: 'ghost' }) : null,
-        btn('Cancel', () => { pending = null; rerender(); }, { kind: 'ghost' }))),
-
-    slots.length ? h('div', { class: 'gd-to' },
-      h('span', { class: 'gd-to-label' }, 'Ball to'),
-      h('div', { class: 'gd-to-chips' }, ...slots.map((slot) => h('button', {
-        class: `chip-btn ${pending.to === slot ? 'on' : ''}`,
-        onclick: () => { pending = { ...pending, to: slot }; rerender(); },
-      }, carrierLabel(play, slot, game))))) : null,
-
-    yardRow,
-    // The first down of a flag series is crossing midfield, so it is a button of
-    // its own rather than something the app infers from a yard count nobody on
-    // a sideline actually has. It sits with the touchdown: the two good ones.
-    h('div', { class: 'gd-buttons' }, ...PLAY_RESULTS.flatMap((r) => {
-      const one = btn(
-        r.id === 'gain' ? `Gain ${gainYards}` : r.id === 'loss' ? `Loss ${gainYards}` : r.label,
-        () => record(game, r.id, r.id === 'gain' || r.id === 'loss' ? gainYards : 0),
-        { kind: `big tone-${r.tone}` });
-      if (r.id !== 'td' || phaseOf(game) !== 'mid') return [one];
-      return [one, btn(`Crossed midfield +${gainYards}`, () => record(game, 'gain', gainYards, true),
-        { kind: 'big tone-great gd-cross' })];
-    })));
 }
 
 // ---------- Screen ----------
@@ -558,87 +422,30 @@ function scoreboard(game) {
 
   return h('section', { class: 'gd-board' },
     col('us', state.settings.teamName || 'Us'),
-    h('div', { class: 'gd-dd' },
-      clockBar(game),
-      h('button', { class: 'gd-dd-main', onclick: () => downSheet(game) },
-        h('span', { class: 'gd-down' }, `${ordinal(game.down)} down`),
-        h('span', { class: `gd-togo ${phaseOf(game)}` }, PHASES[phaseOf(game)]))),
+    h('div', { class: 'gd-dd' }, clockBar(game)),
     col('them', game.opponent || 'Them'));
 }
 
-// Fixing the down when a tap went wrong, or when the referee disagrees.
-function downSheet(game) {
-  const body = h('div');
-  let down = game.down;
-  let phase = phaseOf(game);
-  const draw = () => body.replaceChildren(
-    h('p', { class: 'p-help' }, 'Four downs to cross midfield, then four more to score. Crossing is the only first down there is.'),
-    h('div', { class: 'field-label' }, 'Down',
-      segmented([1, 2, 3, 4].map((n) => ({ value: n, label: ordinal(n) })), down, (v) => { down = v; draw(); })),
-    h('div', { class: 'field-label' }, 'Going',
-      segmented([{ value: 'mid', label: PHASES.mid }, { value: 'score', label: PHASES.score }], phase,
-        (v) => { phase = v; draw(); })),
-    h('div', { class: 'btn-row' },
-      btn('New series', () => { down = 1; phase = 'mid'; draw(); }, { kind: 'ghost', iconName: 'restart' })));
-  draw();
-  openSheet({
-    title: 'Down',
-    size: 'sm',
-    body,
-    actions: [
-      { label: 'Cancel', kind: 'ghost' },
-      { label: 'Set', kind: 'primary', onClick: async () => { await saveGame({ ...game, down, phase }); rerender(); } },
-    ],
-  });
-}
-
-function logList(game) {
-  const log = (game.log || []).slice().reverse();
-  if (!log.length) return h('p', { class: 'p-help pad' }, 'Nothing logged yet. Call a play and tap what happened.');
-  return h('div', { class: 'gd-log' }, ...log.map((e) => {
-    const r = PLAY_RESULTS.find((x) => x.id === e.result);
-    const gained = e.result === 'td' ? 'TD' : e.result === 'turnover' ? 'TO'
-      : e.result === 'loss' ? `−${Math.abs(e.yards)}` : e.result === 'none' ? '0' : `+${e.yards}`;
-    // Games logged before flag downs carried a yards-to-go number; they keep it.
-    const dd = e.phase ? `${ordinal(e.down)} ${e.phase === 'score' ? 'to score' : 'to mid'}`
-      : `${ordinal(e.down)} & ${e.toGo}`;
-    return h('div', { class: 'gd-log-row' },
-      h('span', { class: 'gd-log-dd' }, dd),
-      h('span', { class: 'grow' }, e.playName,
-        e.toName ? h('span', { class: 'muted small' }, ` · to ${e.toName}`) : null),
-      e.crossed ? h('span', { class: 'gd-log-first' }, '1st') : null,
-      h('span', { class: `gd-log-res tone-${r?.tone || 'neutral'}` }, gained));
-  }));
-}
-
+// Playing time: minutes first, because that is what a parent counts, with the
+// snap count next to it for the coach who thinks in plays. Fewest first is the
+// order you sub from, and whoever is out there right now is outlined.
 function timeList(game) {
   const roster = rosterFor();
-  if (!roster.length) return h('p', { class: 'p-help pad' }, 'Add players on the Roster tab and their snaps show up here.');
+  if (!roster.length) return h('p', { class: 'p-help pad' }, 'Add players on the Roster tab and their playing time shows up here.');
   const { rows, total } = snapRows(game, roster);
-  if (!total) {
-    return h('p', { class: 'p-help pad' }, 'Pick who is on the field, then log a play. Snaps are counted from there, fewest first.');
-  }
   const on = game.onField || [];
-  return h('div', { class: 'gd-time' }, ...rows.map(({ player, entry, snaps, pct }) =>
-    h('div', { class: `gd-time-row ${on.includes(player.id) ? 'on' : ''}` },
-      avatarOf(player),
-      h('span', { class: 'grow' },
-        h('div', { class: 'gd-time-name' }, player.first, entry.number ? h('span', { class: 'muted' }, ` #${entry.number}`) : null),
-        h('div', { class: 'gd-bar' }, h('i', { style: { width: `${pct}%` } }))),
-      h('span', { class: 'gd-time-num' }, String(snaps), h('small', null, `${pct}%`)))));
-}
-
-function summary(game) {
-  const log = game.log || [];
-  if (!log.length) return null;
-  const yards = log.reduce((t, e) => t + (e.result === 'loss' ? -Math.abs(e.yards) : e.yards || 0), 0);
-  const tds = log.filter((e) => e.result === 'td').length;
-  const worked = log.filter((e) => e.result === 'td' || e.result === 'gain').length;
-  return h('div', { class: 'gd-summary' },
-    h('div', null, h('b', null, String(log.length)), h('small', null, 'plays')),
-    h('div', null, h('b', null, String(yards)), h('small', null, 'yards')),
-    h('div', null, h('b', null, String(tds)), h('small', null, 'TDs')),
-    h('div', null, h('b', null, `${Math.round((worked / log.length) * 100)}%`), h('small', null, 'gained')));
+  return h('div', null,
+    h('div', { class: 'section-label' }, `Playing time · ${total} play${total === 1 ? '' : 's'} run`),
+    h('div', { class: 'gd-time' }, ...rows.map(({ player, entry, snaps, ms, timePct }) =>
+      h('div', { class: `gd-time-row ${on.includes(player.id) ? 'on' : ''}`, dataset: { player: player.id } },
+        avatarOf(player),
+        h('span', { class: 'grow' },
+          h('div', { class: 'gd-time-name' }, player.first, entry.number ? h('span', { class: 'muted' }, ` #${entry.number}`) : null),
+          h('div', { class: 'gd-bar' }, h('i', { style: { width: `${timePct}%` } }))),
+        h('span', { class: 'gd-time-num' },
+          h('b', { class: 'gd-time-clock' }, clockText(ms)),
+          h('small', null, `${snaps} play${snaps === 1 ? '' : 's'}`))))),
+    total ? null : h('p', { class: 'p-help' }, 'Start the clock and the minutes run for whoever is on the field. Tap Play ran to count a snap.'));
 }
 
 function build() {
@@ -661,23 +468,17 @@ function build() {
       h('div', { class: 'empty-state' },
         h('div', { class: 'empty-icon' }, icon('whistle')),
         h('h3', null, 'No game started'),
-        h('p', null, 'Start a game to keep score, call plays off your formations, and log what each one actually does. Those results show up next to your plays afterwards.'),
+        h('p', null, 'Start a game to keep score and track playing time — minutes off the clock for whoever is on the field, and one tap a snap.'),
         btn('Start a game', startGame, { kind: 'primary', iconName: 'plus' })));
   }
-
-  const callRow = pending ? pendingCard(game) : h('div', { class: 'gd-callrow' },
-    btn('Call a play', () => callSheet(game), { iconName: 'playbook', kind: 'primary big grow' }),
-    (game.log || []).length ? btn('Undo last', () => undoLast(game), { iconName: 'undo', kind: 'ghost' }) : null);
 
   return h('div', { class: 'page gameday' }, head,
     scoreboard(game),
     lineupBar(game),
-    callRow,
-    summary(game),
-    h('div', { class: 'gd-tabs' }, segmented(
-      [{ value: 'log', label: 'Play log' }, { value: 'time', label: 'Playing time' }], tab,
-      (v) => { tab = v; rerender(); }, { cls: 'small' })),
-    tab === 'log' ? logList(game) : timeList(game));
+    h('div', { class: 'gd-callrow' },
+      btn('Play ran', () => playRan(game), { iconName: 'whistle', kind: 'primary big grow' }),
+      (game.log || []).length ? btn('Undo', () => undoLast(game), { iconName: 'undo', kind: 'ghost' }) : null),
+    timeList(game));
 }
 
 function gameListSheet() {
@@ -689,12 +490,12 @@ function gameListSheet() {
   const row = (g) => h('div', { class: 'check-row' },
     h('button', {
       class: 'grow gd-game-row',
-      onclick: () => { currentId = g.id; pending = null; sheet?.close(); rerender(); },
+      onclick: () => { currentId = g.id; sheet?.close(); rerender(); },
     },
     h('b', null, g.opponent || 'Game'),
     h('span', { class: 'muted small' }, ` ${new Date(g.date).toLocaleDateString()} · ${g.us}–${g.them} · ${(g.log || []).length} plays`)),
     iconBtn('trash', async () => {
-      if (!(await confirmDialog({ title: `Delete ${g.opponent || 'this game'}?`, message: 'The score and every play logged in it are removed. This cannot be undone.', confirmText: 'Delete', danger: true }))) return;
+      if (!(await confirmDialog({ title: `Delete ${g.opponent || 'this game'}?`, message: 'The score, the playing time and every play logged in it are removed. This cannot be undone.', confirmText: 'Delete', danger: true }))) return;
       await deleteGame(g.id);
       if (currentId === g.id) currentId = null;
       rerender();
