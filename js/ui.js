@@ -47,6 +47,7 @@ const ICONS = {
   pause: '<rect x="6" y="4.5" width="4" height="15" rx="1" fill="currentColor"/><rect x="14" y="4.5" width="4" height="15" rx="1" fill="currentColor"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
+  swap: '<path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 12 4 4-4 4"/><path d="M21 16H7"/>',
   flip: '<path d="M12 3v18"/><path d="M9 7 3.5 12 9 17z"/><path d="m15 7 5.5 5-5.5 5z"/>',
   trash: '<path d="M3.5 6h17"/><path d="M8.5 6V4h7v2"/><path d="m6 6 1 14h10l1-14"/><path d="M10 10v6m4-6v6"/>',
   copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',

@@ -8,6 +8,12 @@ const r2 = (n) => Math.round(n * 100) / 100;
 export const SLOTS = ['QB', 'C', 'X', 'Y', 'Z'];
 export const SLOT_COLORS = { QB: '#f1f5f9', C: '#a855f7', X: '#ef4444', Y: '#facc15', Z: '#3b82f6' };
 export const SLOT_TEXT = { QB: '#0f172a', C: '#ffffff', X: '#ffffff', Y: '#1c1917', Z: '#ffffff' };
+// Defence has its own five, named the way the defensive playbook names them:
+// the rusher, two corners, the linebacker and the safety.
+export const DEF_SLOTS = ['R', 'C1', 'C2', 'LB', 'S'];
+// Red for defence, as on the diagrams: the rusher solid, the cover four pale.
+export const DEF_SLOT_COLORS = { R: '#dc2626', C1: '#fecaca', C2: '#fecaca', LB: '#fecaca', S: '#fecaca' };
+export const DEF_SLOT_TEXT = { R: '#ffffff', C1: '#7f1d1d', C2: '#7f1d1d', LB: '#7f1d1d', S: '#7f1d1d' };
 export const ROUTE_COLORS = { ...SLOT_COLORS, QB: '#e2e8f0' };
 
 export const POSITIONS = ['QB', 'C', 'WR', 'RB', 'Rusher', 'CB', 'Safety', 'LB'];
@@ -103,23 +109,43 @@ export const newGame = (seasonId, opponent = '', minutes = 25) => ({
   // Who is playing where. Every snap records its own copy of both, so
   // substituting mid-drive does not rewrite who played the earlier plays.
   spots: {}, onField: [],
+  // Which unit is out there, and the other one waiting to swap in. `spots` and
+  // `onField` are always whoever is on the field now; `pendingSpots` is the
+  // other side, set up ahead of time so the change is one tap.
+  side: 'offense', pendingSpots: {},
   // Playing time, banked per player, plus when whoever is out there now started
   // running the meter. See bankTime below.
-  timeMs: {}, timeSince: null,
+  timeMs: {}, timeSince: null, sideMs: { offense: {}, defense: {} },
   createdAt: Date.now(), updatedAt: Date.now(),
 });
+
+// Offence or defence. A game from before there were two sides is on offence.
+export const SIDES = ['offense', 'defense'];
+export const sideOf = (game) => (game?.side === 'defense' ? 'defense' : 'offense');
+export const otherSide = (side) => (side === 'defense' ? 'offense' : 'defense');
+export const sideLabel = (side) => (side === 'defense' ? 'Defense' : 'Offense');
+export const slotsFor = (side) => (side === 'defense' ? DEF_SLOTS : SLOTS);
+export const slotColors = (side) => (side === 'defense' ? DEF_SLOT_COLORS : SLOT_COLORS);
+export const slotText = (side) => (side === 'defense' ? DEF_SLOT_TEXT : SLOT_TEXT);
 
 // The five on the field, in the order the positions are listed, from whichever
 // shape the game happens to carry: spots for a game that assigned positions,
 // the flat list for one recorded before positions existed.
 export function fieldSpots(game) {
+  const slots = slotsFor(sideOf(game));
   const spots = game?.spots || {};
-  const used = SLOTS.map((slot) => ({ slot, playerId: spots[slot] || null }));
+  const used = slots.map((slot) => ({ slot, playerId: spots[slot] || null }));
   if (used.some((s) => s.playerId)) return used;
   const flat = game?.onField || [];
-  return SLOTS.map((slot, i) => ({ slot, playerId: flat[i] || null }));
+  return slots.map((slot, i) => ({ slot, playerId: flat[i] || null }));
 }
-export const spotIds = (spots) => SLOTS.map((s) => spots[s]).filter(Boolean);
+// The side waiting to go on. It can be half filled; the swap asks first.
+export function pendingSpotList(game) {
+  const spots = game?.pendingSpots || {};
+  return slotsFor(otherSide(sideOf(game))).map((slot) => ({ slot, playerId: spots[slot] || null }));
+}
+export const spotIds = (spots, slots = SLOTS) => slots.map((s) => spots[s]).filter(Boolean);
+export const spotsObject = (list) => Object.fromEntries(list.filter((s) => s.playerId).map((s) => [s.slot, s.playerId]));
 
 // ---------- Playing time ----------
 //
@@ -141,15 +167,28 @@ function liveSpan(game, now) {
 export function bankTime(game, now = Date.now()) {
   if (!game?.timeSince) return game;
   const add = liveSpan(game, now);
+  const side = sideOf(game);
   const timeMs = { ...(game.timeMs || {}) };
-  for (const id of game.onField || []) timeMs[id] = (timeMs[id] || 0) + add;
-  return { ...game, timeMs, timeSince: null };
+  const mine = { ...(game.sideMs?.[side] || {}) };
+  for (const id of game.onField || []) {
+    timeMs[id] = (timeMs[id] || 0) + add;
+    mine[id] = (mine[id] || 0) + add;
+  }
+  return { ...game, timeMs, sideMs: { offense: {}, defense: {}, ...(game.sideMs || {}), [side]: mine }, timeSince: null };
 }
 
 // What a player has played so far, banked plus whatever the meter is running.
 export function playedMs(game, playerId, now = Date.now()) {
   const base = game?.timeMs?.[playerId] || 0;
   if (!game?.timeSince || !(game.onField || []).includes(playerId)) return base;
+  return base + liveSpan(game, now);
+}
+
+// The same, for one side of the ball. Time banked before games knew about
+// sides is in the total but in neither half of the split.
+export function playedSideMs(game, playerId, side, now = Date.now()) {
+  const base = game?.sideMs?.[side]?.[playerId] || 0;
+  if (side !== sideOf(game) || !game?.timeSince || !(game.onField || []).includes(playerId)) return base;
   return base + liveSpan(game, now);
 }
 
@@ -179,7 +218,13 @@ export function snapRows(game, roster, now = Date.now()) {
   const total = log.filter((e) => (e.onField || []).length).length;
   const rows = roster.map(({ player, entry }) => {
     const snaps = counts.get(player.id) || 0;
-    return { player, entry, snaps, ms: playedMs(game, player.id, now), pct: total ? Math.round((snaps / total) * 100) : 0 };
+    return {
+      player, entry, snaps,
+      ms: playedMs(game, player.id, now),
+      offMs: playedSideMs(game, player.id, 'offense', now),
+      defMs: playedSideMs(game, player.id, 'defense', now),
+      pct: total ? Math.round((snaps / total) * 100) : 0,
+    };
   }).sort((a, b) => a.ms - b.ms || a.snaps - b.snaps || a.player.first.localeCompare(b.player.first));
   // Bars read against whoever has played the most, which is the comparison a
   // coach is actually making.

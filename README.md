@@ -225,6 +225,21 @@ anything other than five. Substituting banks what the five coming off are owed
 before the new five start the meter, and every snap records its own copy of the
 lineup, so a change mid-drive does not rewrite who played the plays before it.
 
+**Offense and defense** each have their own five. The green strip is
+**Currently playing** — the side on the field and the only one on the meter.
+Under it, dashed, is **Pending**: the other side, which you can set up whenever
+you like (defense uses R, C1, C2, LB and S, the defensive playbook's names).
+Its picker marks whoever is on the field right now as *On field now*, so a kid
+playing both ways is easy to spot, and it can be saved half filled. **Swap in
+Defense** (or Offense) is one tap: the side coming off is banked, the pending
+side goes on, and the side that came off becomes the pending one for the swap
+back. Swapping in fewer than five asks first. After a score that usually means
+the ball changes hands — you score on offense, or they score while you are on
+defense — a prompt offers the swap. The playing-time list tags each kid
+*Playing* or *Next* and splits their minutes into offense and defense
+(`O 8:12 · D 4:00`); time played before games had two sides counts in the
+total only. A new game carries both lineups over and starts on offense.
+
 **The score** is +6, +1, +2 and −1 under each side, for you and for them. Tap
 the header to name the opponent.
 
