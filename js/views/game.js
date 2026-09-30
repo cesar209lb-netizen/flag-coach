@@ -11,9 +11,10 @@
 import { h, icon, iconBtn, btn, segmented, openSheet, confirmDialog, promptDialog, toast, initials } from '../ui.js';
 import { state, subscribe, activeSeason, saveGame, saveSettings, deleteGame, gameById, rosterFor } from '../store.js';
 import {
-  newGame, ON_FIELD, SLOTS, SLOT_COLORS, SLOT_TEXT,
-  newClock, clockLeft, clockRunning, clockText, fieldSpots, spotIds,
-  uid, snapRows, bankTime, playedMs,
+  newGame, ON_FIELD, SLOTS,
+  newClock, clockLeft, clockRunning, clockText, fieldSpots, pendingSpotList, spotIds, spotsObject,
+  sideOf, otherSide, sideLabel, slotsFor, slotColors, slotText,
+  uid, snapRows, bankTime, playedMs, playedSideMs,
 } from '../model.js';
 
 // Which game is on screen.
@@ -67,6 +68,8 @@ function tickTime(root, game) {
   rows.forEach((el, i) => {
     const num = el.querySelector('.gd-time-clock');
     if (num) num.textContent = clockText(vals[i]);
+    const split = el.querySelector('.gd-time-split');
+    if (split) split.textContent = splitText(game, el.dataset.player);
     const bar = el.querySelector('.gd-bar i');
     if (bar) bar.style.width = `${most ? Math.round((vals[i] / most) * 100) : 0}%`;
   });
@@ -147,13 +150,20 @@ function current() {
 async function startGame() {
   const season = activeSeason();
   const g = newGame(season?.id || null, '', halfLength());
-  // Carry the last game's lineup over — it is usually the same five kids, and
-  // an empty field on the first snap is a worse default than a stale one.
+  // Carry the last game's lineups over, offence and defence both — it is
+  // usually the same kids, and an empty field on the first snap is a worse
+  // default than a stale one. A new game always starts on offence; the swap
+  // is one tap if the other team has the ball first.
   const prev = gamesForSeason()[0];
   const roster = rosterFor();
-  if (prev?.onField?.length) {
-    g.onField = prev.onField.filter((id) => roster.some((r) => r.player.id === id));
-    g.spots = Object.fromEntries(Object.entries(prev.spots || {}).filter(([, id]) => g.onField.includes(id)));
+  if (prev) {
+    const keep = (spots) => Object.fromEntries(Object.entries(spots || {})
+      .filter(([, id]) => id && roster.some((r) => r.player.id === id)));
+    const was = sideOf(prev);
+    const lineups = { [was]: spotsObject(fieldSpots(prev)), [otherSide(was)]: prev.pendingSpots || {} };
+    g.spots = keep(lineups.offense);
+    g.onField = spotIds(g.spots, SLOTS);
+    g.pendingSpots = keep(lineups.defense);
   }
   await saveGame(g);
   currentId = g.id;
@@ -178,7 +188,7 @@ async function playRan(game) {
     return;
   }
   const entry = {
-    id: uid(), at: Date.now(),
+    id: uid(), at: Date.now(), side: sideOf(game),
     onField: [...(game.onField || [])],
     spots: { ...(game.spots || {}) },
   };
@@ -202,32 +212,103 @@ function avatarOf(player, cls = '') {
     : h('span', { class: `gd-av ${cls}`.trim() }, initials(player));
 }
 
+function faces(spots, roster, side) {
+  const colors = slotColors(side), text = slotText(side);
+  return h('span', { class: 'gd-avs' }, ...spots.map(({ slot, playerId }) => {
+    const r = roster.find((x) => x.player.id === playerId);
+    return h('span', { class: 'gd-av-wrap', title: r ? `${r.player.first} at ${slot}` : slot },
+      r ? avatarOf(r.player) : h('span', { class: 'gd-av gap' }),
+      h('span', { class: 'gd-av-slot', style: { background: colors[slot], color: text[slot] } }, slot));
+  }));
+}
+
+// Two strips: the side on the field now, loud, and the side waiting to go on,
+// quiet, with the swap button beside it. Setting the defence up while the
+// offence is out there means the change of possession is one tap.
 function lineupBar(game) {
   const roster = rosterFor();
   if (!roster.length) {
     return h('button', { class: 'gd-lineup empty', onclick: () => { location.hash = '#/roster'; } },
       icon('users'), h('span', null, 'Add players on the Roster tab to track who is on the field'));
   }
-  const { rows } = snapRows(game, roster);
+  const side = sideOf(game);
   const spots = fieldSpots(game);
   const filled = spots.filter((s) => s.playerId).length;
-  const onIds = spots.map((s) => s.playerId).filter(Boolean);
-  const bench = rows.filter((r) => !onIds.includes(r.player.id));
-  const next = bench.slice(0, 2).map((r) => r.player.first).join(', ');
   // One slot per position, always, with the gaps drawn — a position nobody is
   // playing should be as obvious as one somebody is.
   const short = filled < ON_FIELD;
-  return h('button', { class: `gd-lineup ${short ? 'short' : ''}`, onclick: () => lineupSheet(game) },
-    h('span', { class: 'gd-lineup-label' }, short ? `${filled} of ${ON_FIELD} — tap to fill` : 'On the field'),
-    h('span', { class: 'gd-avs' }, ...spots.map(({ slot, playerId }) => {
-      const r = roster.find((x) => x.player.id === playerId);
-      return h('span', { class: 'gd-av-wrap', title: r ? `${r.player.first} at ${slot}` : slot },
-        r ? avatarOf(r.player) : h('span', { class: 'gd-av gap' }),
-        h('span', { class: 'gd-av-slot', style: { background: SLOT_COLORS[slot], color: SLOT_TEXT[slot] } }, slot));
-    })),
+  const live = h('button', { class: `gd-lineup live ${short ? 'short' : ''}`, onclick: () => lineupSheet(game) },
+    h('span', { class: 'gd-unit' },
+      h('span', { class: 'gd-unit-tag live' }, 'Currently playing'),
+      h('b', { class: 'gd-unit-side' }, sideLabel(side)),
+      short ? h('span', { class: 'gd-unit-short' }, `${filled} of ${ON_FIELD} — tap to fill`) : null),
+    faces(spots, roster, side),
     h('div', { class: 'spacer' }),
-    next ? h('span', { class: 'gd-next muted small' }, `Up next: ${next}`) : null,
     icon('next', 'chev'));
+
+  const nextSide = otherSide(side);
+  const waiting = pendingSpotList(game);
+  const ready = waiting.filter((s) => s.playerId).length;
+  const pending = h('div', { class: 'gd-lineup pending' },
+    h('button', { class: 'gd-pending-edit', onclick: () => lineupSheet(game, 'pending') },
+      h('span', { class: 'gd-unit' },
+        h('span', { class: 'gd-unit-tag' }, 'Pending'),
+        h('b', { class: 'gd-unit-side' }, sideLabel(nextSide)),
+        ready < ON_FIELD ? h('span', { class: 'gd-unit-short' }, ready ? `${ready} of ${ON_FIELD} set` : 'Tap to set up') : null),
+      faces(waiting, roster, nextSide)),
+    btn(`Swap in ${sideLabel(nextSide)}`, () => swapSides(game), { iconName: 'swap', kind: 'primary gd-swap' }));
+
+  return h('div', { class: 'gd-units' }, live, pending);
+}
+
+// The change of possession. What the side coming off is owed goes in the bank
+// before the side going on starts the meter, and the side coming off becomes
+// the pending one, ready for the next swap back.
+async function swapSides(game) {
+  game = gameById(game.id) || game;
+  dismissSwapHint();
+  const nextSide = otherSide(sideOf(game));
+  const incoming = game.pendingSpots || {};
+  const ids = spotIds(incoming, slotsFor(nextSide));
+  if (!ids.length) {
+    toast(`Pick the ${sideLabel(nextSide).toLowerCase()} first`);
+    lineupSheet(game, 'pending');
+    return;
+  }
+  if (ids.length < ON_FIELD && !(await confirmDialog({
+    title: `Only ${ids.length} of ${ON_FIELD} on ${sideLabel(nextSide).toLowerCase()}`,
+    message: `${ON_FIELD - ids.length} position${ON_FIELD - ids.length === 1 ? ' is' : 's are'} still empty. Swap them in anyway? You can fill the gaps from the Currently playing bar.`,
+    confirmText: 'Swap anyway',
+  }))) return;
+  game = gameById(game.id) || game;
+  const banked = bankTime(game);
+  const running = clockRunning(banked.clock);
+  await saveGame({
+    ...banked,
+    side: nextSide,
+    spots: { ...incoming },
+    onField: ids,
+    pendingSpots: spotsObject(fieldSpots(game)),
+    timeSince: running ? Date.now() : null,
+  });
+  toast(`${sideLabel(nextSide)} is in`);
+  rerender();
+}
+
+// After a score the ball usually changes hands, so the swap is offered — only
+// when it makes sense: we scored on offence, or they scored while we were on
+// defence. A second score (the extra point) replaces the offer, never stacks.
+let swapHint = null;
+function dismissSwapHint() { swapHint?.(); swapHint = null; }
+function offerSwap(game, scorer) {
+  const side = sideOf(game);
+  if ((scorer === 'us') !== (side === 'offense')) return;
+  const label = sideLabel(otherSide(side));
+  dismissSwapHint();
+  swapHint = toast(`Score! Swap in ${label}?`, {
+    duration: 10000,
+    action: { label: 'Swap', onClick: () => { swapHint = null; swapSides(game); } },
+  });
 }
 
 // Picking the five, by position. Five position cards across the top and the
@@ -235,19 +316,26 @@ function lineupBar(game) {
 // first empty one), drag them onto a spot, or tap a spot to send that player
 // back. The positions are the play's own — the X on this card is the X on every
 // diagram in the playbook.
-function lineupSheet(game) {
+//
+// The same sheet sets up the pending side: the positions are that side's, it
+// can be saved half filled, and nobody's minutes change until the swap.
+function lineupSheet(game, mode = 'live') {
   const roster = rosterFor();
   const body = h('div');
-  let spots = Object.fromEntries(fieldSpots(game).map(({ slot, playerId }) => [slot, playerId]));
+  const isPending = mode === 'pending';
+  const side = isPending ? otherSide(sideOf(game)) : sideOf(game);
+  const SL = slotsFor(side);
+  const colors = slotColors(side), text = slotText(side);
+  let spots = Object.fromEntries((isPending ? pendingSpotList(game) : fieldSpots(game)).map(({ slot, playerId }) => [slot, playerId]));
   let aim = null;   // the position waiting for somebody, if one was tapped
   let doneBtn = null;
 
   const playerOf = (id) => roster.find((r) => r.player.id === id) || null;
-  const firstEmpty = () => SLOTS.find((sl) => !spots[sl]) || null;
+  const firstEmpty = () => SL.find((sl) => !spots[sl]) || null;
 
   const place = (slot, playerId) => {
     // A player only stands in one place; taking a spot gives up the old one.
-    for (const sl of SLOTS) if (spots[sl] === playerId) spots[sl] = null;
+    for (const sl of SL) if (spots[sl] === playerId) spots[sl] = null;
     spots[slot] = playerId;
     aim = null;
     draw();
@@ -261,7 +349,7 @@ function lineupSheet(game) {
       dataset: { spot: slot },
       onclick: () => { if (r) clear(slot); else { aim = aim === slot ? null : slot; draw(); } },
     },
-    h('span', { class: 'gd-spot-tag', style: { background: SLOT_COLORS[slot], color: SLOT_TEXT[slot] } }, slot),
+    h('span', { class: 'gd-spot-tag', style: { background: colors[slot], color: text[slot] } }, slot),
     h('div', { class: 'gd-spot-photo' },
       r ? (r.player.photo
         ? h('img', { src: r.player.photo, alt: '', draggable: 'false' })
@@ -271,9 +359,12 @@ function lineupSheet(game) {
   };
 
   // Who was on the field for the most recent snap. Coming off, they land in
-  // their own yellow group, so nobody goes straight back in by accident.
+  // their own yellow group, so nobody goes straight back in by accident. For
+  // the pending side it is whoever is out there right now instead: they are
+  // the ones who would be playing both ways.
   const lastSnap = (game.log || [])[(game.log || []).length - 1];
-  const justPlayed = new Set(lastSnap?.onField || []);
+  const justPlayed = new Set(isPending ? (game.onField || []) : (lastSnap?.onField || []));
+  const justTag = isPending ? 'On field now' : 'Just played';
 
   const benchCard = ({ player, entry, snaps, ms, timePct }) => {
     const fresh = justPlayed.has(player.id);
@@ -289,7 +380,7 @@ function lineupSheet(game) {
     h('div', { class: 'gd-card-photo' },
       player.photo ? h('img', { src: player.photo, alt: '', draggable: 'false' }) : h('span', { class: 'gd-card-initials' }, initials(player)),
       entry.number ? h('span', { class: 'gd-card-num' }, `#${entry.number}`) : null,
-      fresh ? h('span', { class: 'gd-card-just' }, 'Just played') : null),
+      fresh ? h('span', { class: 'gd-card-just' }, justTag) : null),
     h('div', { class: 'gd-card-name' }, player.first),
     h('div', { class: 'gd-card-time' },
       h('span', null, `${clockText(ms)} · ${snaps} play${snaps === 1 ? '' : 's'}`),
@@ -348,19 +439,20 @@ function lineupSheet(game) {
 
   const draw = () => {
     const { rows, total } = snapRows(game, roster);
-    const onIds = spotIds(spots);
+    const onIds = spotIds(spots, SL);
     const off = rows.filter((r) => !onIds.includes(r.player.id));
     const fresh = off.filter((r) => justPlayed.has(r.player.id));
     const rested = off.filter((r) => !justPlayed.has(r.player.id));
-    if (doneBtn) doneBtn.disabled = onIds.length !== ON_FIELD;
+    if (doneBtn) doneBtn.disabled = !isPending && onIds.length !== ON_FIELD;
     // replaceChildren turns a null into the text "null", unlike h(), so the
     // list is filtered before it goes in.
     body.replaceChildren(...[
       h('div', { class: `gd-fieldcount ${onIds.length === ON_FIELD ? 'ok' : ''}` },
         h('b', null, `${onIds.length} of ${ON_FIELD} positions filled`),
         h('span', { class: 'muted small' }, aim ? `Tap a player to put them at ${aim}`
-          : total ? `${total} play${total === 1 ? '' : 's'} run so far` : 'Tap a player, or drag them onto a spot')),
-      h('div', { class: 'gd-spots' }, ...SLOTS.map(spotCard)),
+          : isPending ? 'Nothing changes until you tap Swap — it can be saved half filled'
+            : total ? `${total} play${total === 1 ? '' : 's'} run so far` : 'Tap a player, or drag them onto a spot')),
+      h('div', { class: 'gd-spots' }, ...SL.map(spotCard)),
       // Rested first, because they are who you are reaching for; whoever just
       // came off sits underneath in yellow.
       ...(rested.length ? [
@@ -368,7 +460,7 @@ function lineupSheet(game) {
         h('div', { class: 'gd-cards' }, ...rested.map(benchCard)),
       ] : []),
       ...(fresh.length ? [
-        h('div', { class: 'section-label just' }, 'Just played · last snap'),
+        h('div', { class: 'section-label just' }, isPending ? `On the field now · ${sideLabel(sideOf(game)).toLowerCase()}` : 'Just played · last snap'),
         h('div', { class: 'gd-cards' }, ...fresh.map(benchCard)),
       ] : []),
       off.length ? null : h('p', { class: 'p-help' }, 'Everybody is in.'),
@@ -377,7 +469,7 @@ function lineupSheet(game) {
   draw();
 
   const sheet = openSheet({
-    title: 'On the field',
+    title: isPending ? `Pending · ${sideLabel(side)}` : `Currently playing · ${sideLabel(side)}`,
     size: 'lg',
     onClose: endDrag,
     body,
@@ -386,7 +478,12 @@ function lineupSheet(game) {
       {
         label: 'Done', kind: 'primary',
         onClick: async () => {
-          const ids = spotIds(spots);
+          const ids = spotIds(spots, SL);
+          if (isPending) {
+            await saveGame({ ...(gameById(game.id) || game), pendingSpots: spotsObject(SL.map((slot) => ({ slot, playerId: spots[slot] }))) });
+            rerender();
+            return;
+          }
           if (ids.length !== ON_FIELD) return false;
           // Bank what the five leaving the field are owed before the new five
           // start the meter, otherwise a substitution would pay the wrong kids.
@@ -399,7 +496,7 @@ function lineupSheet(game) {
     ],
   });
   doneBtn = sheet.panel.querySelector('.sheet-foot .btn.primary');
-  if (doneBtn) doneBtn.disabled = spotIds(spots).length !== ON_FIELD;
+  if (doneBtn) doneBtn.disabled = !isPending && spotIds(spots, SL).length !== ON_FIELD;
 }
 
 // ---------- Screen ----------
@@ -410,6 +507,7 @@ function scoreboard(game) {
     g[side] = Math.max(0, g[side] + n);
     await saveGame(g);
     rerender();
+    if (n > 0) offerSwap(g, side);
   };
   const col = (side, label) => h('div', { class: 'gd-score-col' },
     h('div', { class: 'gd-score-label' }, label),
@@ -434,18 +532,27 @@ function timeList(game) {
   if (!roster.length) return h('p', { class: 'p-help pad' }, 'Add players on the Roster tab and their playing time shows up here.');
   const { rows, total } = snapRows(game, roster);
   const on = game.onField || [];
+  const next = pendingSpotList(game).map((s) => s.playerId).filter(Boolean);
   return h('div', null,
     h('div', { class: 'section-label' }, `Playing time · ${total} play${total === 1 ? '' : 's'} run`),
     h('div', { class: 'gd-time' }, ...rows.map(({ player, entry, snaps, ms, timePct }) =>
       h('div', { class: `gd-time-row ${on.includes(player.id) ? 'on' : ''}`, dataset: { player: player.id } },
         avatarOf(player),
         h('span', { class: 'grow' },
-          h('div', { class: 'gd-time-name' }, player.first, entry.number ? h('span', { class: 'muted' }, ` #${entry.number}`) : null),
+          h('div', { class: 'gd-time-name' }, player.first, entry.number ? h('span', { class: 'muted' }, ` #${entry.number}`) : null,
+            on.includes(player.id) ? h('span', { class: 'gd-tag live' }, 'Playing') : null,
+            next.includes(player.id) ? h('span', { class: 'gd-tag' }, 'Next') : null),
           h('div', { class: 'gd-bar' }, h('i', { style: { width: `${timePct}%` } }))),
         h('span', { class: 'gd-time-num' },
           h('b', { class: 'gd-time-clock' }, clockText(ms)),
+          h('small', { class: 'gd-time-split' }, splitText(game, player.id)),
           h('small', null, `${snaps} play${snaps === 1 ? '' : 's'}`))))),
     total ? null : h('p', { class: 'p-help' }, 'Start the clock and the minutes run for whoever is on the field. Tap Play ran to count a snap.'));
+}
+
+// Offence and defence minutes, short enough to sit under the total.
+function splitText(game, playerId) {
+  return `O ${clockText(playedSideMs(game, playerId, 'offense'))} · D ${clockText(playedSideMs(game, playerId, 'defense'))}`;
 }
 
 function build() {
